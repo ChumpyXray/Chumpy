@@ -324,4 +324,5 @@
     <string name="per_app_search">Поиск приложений</string>
     <string name="per_app_search_empty">Приложения не найдены</string>
     <string name="subscription_link_title">Добавить подписку?</string>
+    <string name="local_network_permission_required">Разрешите доступ к устройствам поблизости, чтобы принимать файлы с телефона.</string>
 </resources>

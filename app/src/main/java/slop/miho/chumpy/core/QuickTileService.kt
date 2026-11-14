@@ -80,7 +80,8 @@ class QuickTileService : TileService() {
             TunnelState.UP, TunnelState.CONNECTING -> ChumpyVpnService.startDisconnect(this)
             TunnelState.DISCONNECTING -> Unit
             else -> {
-                val needsSetup = !CoreConfigFile.has(this) || VpnService.prepare(this) != null
+                val needsSetup = !CoreConfigFile.has(this) || VpnService.prepare(this) != null ||
+                    (Build.VERSION.SDK_INT >= 37 && checkSelfPermission(android.Manifest.permission.ACCESS_LOCAL_NETWORK) != android.content.pm.PackageManager.PERMISSION_GRANTED)
                 if (needsSetup) {
                     // Missing config or VPN consent: hand over to the app once unlocked.
                     unlockAndRun {

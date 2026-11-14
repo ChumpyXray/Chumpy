@@ -1,6 +1,7 @@
 package slop.miho.chumpy.ui.main
 
-import android.app.Activity
+import androidx.activity.compose.LocalActivity
+import slop.miho.chumpy.ui.components.ControllerActivity
 import android.net.VpnService
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
@@ -145,6 +146,7 @@ fun MainShell(viewModel: MainViewModel) {
     val update by viewModel.update.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
 
+    val activity = LocalActivity.current as? ControllerActivity
     val context = LocalContext.current
     val vpnPermission = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) viewModel.connect()
@@ -169,7 +171,7 @@ fun MainShell(viewModel: MainViewModel) {
     // strip hands its land back. A finger on the glass brings the bar up again, as it
     // brings everything else back.
     LaunchedEffect(controller) {
-        val window = (context as? Activity)?.window ?: return@LaunchedEffect
+        val window = activity?.window ?: return@LaunchedEffect
         val insets = WindowCompat.getInsetsController(window, window.decorView)
         if (controller) {
             insets.systemBarsBehavior =
@@ -255,8 +257,10 @@ fun MainShell(viewModel: MainViewModel) {
 
     // The connect ask rides the VPN permission the same way whichever pane asks for it.
     val connectWithConsent: () -> Unit = {
-        val consent = VpnService.prepare(context)
-        if (consent != null) vpnPermission.launch(consent) else viewModel.connect()
+        activity?.withLocalNetworkPermission {
+            val consent = VpnService.prepare(context)
+            if (consent != null) vpnPermission.launch(consent) else viewModel.connect()
+        }
     }
 
     // The settings pages' shared scroll state, owned above either layout — the pager
@@ -458,7 +462,11 @@ fun MainShell(viewModel: MainViewModel) {
                     onPingServers = viewModel::pingServers,
                     onUpdateSubscription = viewModel::updateSelectedSubscription,
                     onSelectSubscription = viewModel::selectSubscription,
-                    onAddSubscription = viewModel::addSubscription,
+                    onAddSubscription = { url, name, done ->
+                        activity?.withLocalNetworkPermission {
+                            viewModel.addSubscription(url, name, done)
+                        }
+                    },
                     onDeleteSubscription = viewModel::deleteSubscription,
                     onDeleteManualProfile = viewModel::deleteManualProfile,
                     onTogglePinned = viewModel::toggleProfilePinned,
@@ -523,7 +531,11 @@ fun MainShell(viewModel: MainViewModel) {
                     onPingServers = viewModel::pingServers,
                     onUpdateSubscription = viewModel::updateSelectedSubscription,
                     onSelectSubscription = viewModel::selectSubscription,
-                    onAddSubscription = viewModel::addSubscription,
+                    onAddSubscription = { url, name, done ->
+                        activity?.withLocalNetworkPermission {
+                            viewModel.addSubscription(url, name, done)
+                        }
+                    },
                     onDeleteSubscription = viewModel::deleteSubscription,
                     onDeleteManualProfile = viewModel::deleteManualProfile,
                     onTogglePinned = viewModel::toggleProfilePinned,

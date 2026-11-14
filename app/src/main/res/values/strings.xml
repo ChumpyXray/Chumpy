@@ -328,4 +328,5 @@
     <string name="per_app_search">Search apps</string>
     <string name="per_app_search_empty">No matching apps</string>
     <string name="subscription_link_title">Add subscription?</string>
+    <string name="local_network_permission_required">Allow access to nearby devices to receive files from your phone.</string>
 </resources>

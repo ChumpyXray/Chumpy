@@ -86,10 +86,12 @@ class MainActivity : ControllerActivity() {
                                 onClick = {
                                     importingSubscription = true
                                     subscriptionImportError = null
-                                    viewModel.addSubscription(url) { error ->
-                                        importingSubscription = false
-                                        subscriptionImportError = error
-                                        if (error == null) pendingSubscription = null
+                                    withLocalNetworkPermission {
+                                        viewModel.addSubscription(url) { error ->
+                                            importingSubscription = false
+                                            subscriptionImportError = error
+                                            if (error == null) pendingSubscription = null
+                                        }
                                     }
                                 },
                             ) { Text(stringResource(R.string.phone_import_confirm)) }
@@ -138,7 +140,9 @@ class MainActivity : ControllerActivity() {
                             // main shell takes over the window the moment it composes.
                             SystemBarsIconsDark(dark = LocalDarkTheme.current)
                             WelcomeScreen(
-                                onAddSubscription = viewModel::addSubscription,
+                                onAddSubscription = { url, name, done ->
+                                    withLocalNetworkPermission { viewModel.addSubscription(url, name, done) }
+                                },
                                 onImport = viewModel::addManualProfiles,
                             )
                         }
