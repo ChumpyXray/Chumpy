@@ -2340,10 +2340,8 @@ private fun ServerRow(
                     .combinedClickable(
                         role = Role.Button,
                         onClick = {
-                            if (!selected) {
-                                poke()
-                                onSelect()
-                            }
+                            if (!selected) poke()
+                            onSelect()
                         },
                         // The long press opens the row's own menu — the pin, the
                         // link, the delete — for the loose configs, the rows that

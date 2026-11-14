@@ -803,15 +803,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Selects a server: persists the choice and, if the tunnel is up, reloads the running
-     * core with the new profile in place — the interface stays, the session does not drop.
+     * Persists the selected server and reconnects the active VPN with its configuration.
      */
     fun selectProfile(id: String) {
-        if (_servers.value.selectedProfileId == id) return
+        val state = tunnelStatus.value.state
+        val reconnect = state == TunnelState.UP || state == TunnelState.CONNECTING
+        if (connection.value.selectedProfileId == id &&
+            (!reconnect || (state == TunnelState.UP && activeIdentity.value?.profile?.id == id))) return
         ConnectionStore.update(app) { it.copy(selectedProfileId = id) }
         // The pick is a use: the "last used" order remembers which hand the user played.
         viewModelScope.launch { repository.setProfileLastUsed(id, System.currentTimeMillis()) }
-        if (tunnelStatus.value.state in setOf(TunnelState.UP, TunnelState.CONNECTING)) {
+        if (reconnect) {
             applyConfigAndConnect(_servers.value.profiles.firstOrNull { it.id == id })
         }
     }
