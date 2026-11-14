@@ -44,6 +44,8 @@
     <application
         android:name=".ChumpyApp"
         android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true"
         android:banner="@drawable/tv_banner"
