@@ -43,6 +43,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -320,9 +321,22 @@ private fun AppsPage(
                 OutlinedTextField(
                     value = search,
                     onValueChange = { search = it },
-                    label = { Text(stringResource(R.string.per_app_search)) },
+                    placeholder = {
+                        Text(stringResource(R.string.per_app_search), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                    leadingIcon = {
+                        Icon(painterResource(R.drawable.ic_search), contentDescription = null)
+                    },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    shape = outer,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                    ),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        .focusRing(shape = outer, inset = true, gap = 1.dp),
                 )
             }
             if (matching.isEmpty() && !loading) {
