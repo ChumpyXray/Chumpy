@@ -717,18 +717,16 @@ class ChumpyVpnService : VpnService() {
 
     private fun ensureForeground() {
         val manager = getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
-                    getString(R.string.notif_channel_vpn),
-                    NotificationManager.IMPORTANCE_LOW,
-                ).apply {
-                    setShowBadge(false)
-                    description = getString(R.string.notif_channel_vpn_desc)
-                },
-            )
-        }
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.notif_channel_vpn),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                setShowBadge(false)
+                description = getString(R.string.notif_channel_vpn_desc)
+            },
+        )
         startForeground(NOTIFICATION_ID, buildNotification())
     }
 
@@ -763,12 +761,7 @@ class ChumpyVpnService : VpnService() {
             Intent(this, ChumpyVpnService::class.java).setAction(ACTION_DISCONNECT),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, CHANNEL_ID)
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(this).setPriority(Notification.PRIORITY_LOW)
-        }
+        val builder = Notification.Builder(this, CHANNEL_ID)
         builder
             .setSmallIcon(R.drawable.ic_tile_on)
             .setContentTitle(title)

@@ -64,7 +64,9 @@ class MainActivity : ControllerActivity() {
             val notificationsAsk by viewModel.notificationsAsk.collectAsStateWithLifecycle()
             LaunchedEffect(notificationsAsk) {
                 if (notificationsAsk) {
-                    notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
                     viewModel.consumeNotificationsAsk()
                 }
             }
