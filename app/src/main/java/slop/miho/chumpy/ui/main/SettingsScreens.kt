@@ -1883,10 +1883,10 @@ private fun PlainRow(
 fun AboutScreen(
     coreVersion: String?,
     coreRunning: Boolean,
+    modifier: Modifier = Modifier,
     update: UpdateUiState = UpdateUiState(),
     onUpdateChipTap: () -> Unit = {},
     onCheckForUpdate: () -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
     val contentUnderBar by remember(scrollState) {

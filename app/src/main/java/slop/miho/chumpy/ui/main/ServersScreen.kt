@@ -182,6 +182,7 @@ fun ServersScreen(
     subscriptions: List<SubscriptionEntity>,
     selectedSubscription: SubscriptionEntity?,
     state: ServersUiState,
+    modifier: Modifier = Modifier,
     week: List<DailyTraffic> = emptyList(),
     manualCount: Int = 0,
     flagStyle: FlagStyle = FlagStyle.TWEMOJI,
@@ -197,7 +198,6 @@ fun ServersScreen(
     onToggleConcealed: (String, Boolean) -> Unit,
     onSelect: (String) -> Unit,
     onSortServers: (ServersSort) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     // The subscription dropdown's open state; survives page switches so a dialog opened
     // from an unfolded card still has its list waiting behind it.

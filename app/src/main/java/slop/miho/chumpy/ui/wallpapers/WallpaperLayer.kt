@@ -221,10 +221,10 @@ internal fun WallpaperBackdrop(
     blur: () -> Dp,
     scrim: Color,
     scrimAlpha: () -> Float,
+    modifier: Modifier = Modifier,
     desaturate: () -> Float = { 0f },
     offsetX: () -> Float = { 0f },
     offsetY: () -> Float = { 0f },
-    modifier: Modifier = Modifier,
 ) {
     val image = wallpaper.image
     val gif = rememberGifWallpaper(wallpaper)
