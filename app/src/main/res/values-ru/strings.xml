@@ -317,4 +317,6 @@
     <string name="error_geodata_source_missing">В базе %1$s нет категорий %2$s, а подписка не указала адрес их загрузки. Обновите подписку или запросите базу у провайдера.</string>
     <string name="error_geodata_categories">База провайдера не содержит нужных категорий: %1$s.</string>
     <string name="error_geodata_download">Не удалось подготовить базу маршрутизации подписки: %1$s</string>
+    <string name="per_app_search">Поиск приложений</string>
+    <string name="per_app_search_empty">Приложения не найдены</string>
 </resources>

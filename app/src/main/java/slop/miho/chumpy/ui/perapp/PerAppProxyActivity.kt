@@ -43,6 +43,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
@@ -51,6 +52,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -263,8 +265,13 @@ private fun AppsPage(
     // the row where it sits rather than re-sorting the blocks under the finger — the
     // order only settles again on the next visit.
     val initialBypassed = remember { bypassed }
-    val selected = remember(apps) { apps.filter { it.packageName in initialBypassed } }
-    val rest = remember(apps) { apps.filter { it.packageName !in initialBypassed } }
+    var search by rememberSaveable { mutableStateOf("") }
+    val matching = remember(apps, search) {
+        val query = search.trim()
+        apps.filter { it.label.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true) }
+    }
+    val selected = remember(matching) { matching.filter { it.packageName in initialBypassed } }
+    val rest = remember(matching) { matching.filter { it.packageName !in initialBypassed } }
     // Computed here, not in the list's scope: MaterialTheme doesn't reach into it.
     val outer = MaterialTheme.shapes.extraLarge
     val inner = MaterialTheme.shapes.extraSmall
@@ -309,6 +316,23 @@ private fun AppsPage(
                 )
             },
         ) {
+            item(key = "app search") {
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    label = { Text(stringResource(R.string.per_app_search)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                )
+            }
+            if (matching.isEmpty() && !loading) {
+                item(key = "no matching apps") {
+                    Text(
+                        stringResource(R.string.per_app_search_empty),
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
             itemsIndexed(selected, key = { _, app -> app.packageName }) { index, app ->
                 SelectableRow(
                     headline = app.label,
