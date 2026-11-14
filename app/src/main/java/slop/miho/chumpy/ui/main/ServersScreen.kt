@@ -2,6 +2,8 @@ package slop.miho.chumpy.ui.main
 
 import androidx.core.graphics.createBitmap
 import android.content.Intent
+import androidx.core.net.toUri
+import androidx.compose.material3.OutlinedButton
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
@@ -128,6 +130,7 @@ import kotlin.math.roundToInt
 import slop.miho.chumpy.ui.components.restoreControllerFocus
 import slop.miho.chumpy.ui.components.controllerContextMenu
 import slop.miho.chumpy.ui.components.hasUsableCamera
+import slop.miho.chumpy.ui.components.controllerReadFocus
 import slop.miho.chumpy.ui.components.externalAction
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -377,6 +380,13 @@ fun ServersScreen(
                     SubscriptionCard(subscription = selectedSubscription, isUpdating = state.isUpdating,
                         expanded = dropdownOpen, dimmed = menuHost != null, week = week,
                         onToggle = { dropdownOpen = !dropdownOpen }, onUpdate = onUpdate)
+                }
+            }
+            selectedSubscription?.let { subscription ->
+                if (subscription.announcement != null || subscription.supportUrl != null || subscription.webPageUrl != null) {
+                    item(key = "subscription details") {
+                        SubscriptionDetails(subscription)
+                    }
                 }
             }
             item(key = "header") {
@@ -658,6 +668,39 @@ private fun ServersHeader(
  * own spotlight.
  */
 private val LocalSubscriptionUpdateFocus = androidx.compose.runtime.staticCompositionLocalOf<FocusRequester?> { null }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SubscriptionDetails(subscription: SubscriptionEntity) {
+    val context = LocalContext.current
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainer.withSurfaceOpacity(),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            subscription.announcement?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.controllerReadFocus())
+            }
+            if (subscription.supportUrl != null || subscription.webPageUrl != null) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    subscription.supportUrl?.let { url ->
+                        OutlinedButton(
+                            onClick = { context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) } },
+                            modifier = Modifier.focusRing(inset = true),
+                        ) { Text(stringResource(R.string.subscription_support)) }
+                    }
+                    subscription.webPageUrl?.let { url ->
+                        OutlinedButton(
+                            onClick = { context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) } },
+                            modifier = Modifier.focusRing(inset = true),
+                        ) { Text(stringResource(R.string.subscription_website)) }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun SubscriptionCard(
