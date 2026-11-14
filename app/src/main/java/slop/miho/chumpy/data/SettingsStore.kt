@@ -228,6 +228,9 @@ object SettingsStore {
         val updated = transform(old)
         write(context, updated)
         settingsState.value = updated
+        // The launcher orb paints with the settings' own scheme and flag style; a
+        // write here is its repaint telling.
+        slop.miho.chumpy.widget.OrbWidget.tell(context)
         if (old.iconVariant != updated.iconVariant || old.accent != updated.accent ||
             old.themeMode != updated.themeMode || old.customAccent != updated.customAccent ||
             old.maskAddresses != updated.maskAddresses) {

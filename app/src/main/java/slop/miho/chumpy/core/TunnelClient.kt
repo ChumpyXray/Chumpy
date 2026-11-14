@@ -61,6 +61,13 @@ class TunnelClient(private val context: Context) {
     }
 
     /**
+     * Whether the binder is live: a connected link means the registration's own push has
+     * already answered, so [status] holds the core's truth rather than the seed. The
+     * launcher widget waits on this before trusting the flow's first value.
+     */
+    fun isServiceConnected(): Boolean = service != null
+
+    /**
      * Connect (or reload, if already up) using the config the caller just wrote with
      * [CoreConfigFile]. The caller must hold the VPN consent already.
      */

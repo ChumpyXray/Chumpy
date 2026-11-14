@@ -409,6 +409,13 @@ object XrayCore {
             TunnelState.UP -> if (connectedAtMillis == 0L) System.currentTimeMillis() else connectedAtMillis
             else -> 0L
         }
+        // The launcher widget's own telling: the main process may be long dead between
+        // two states, and its orb only repaints when told. Guarded: the unit tests
+        // exercise publication with no born core behind it, and a widget to tell is a
+        // device-only side effect.
+        if (::appContext.isInitialized) {
+            slop.miho.chumpy.widget.OrbWidget.tell(appContext)
+        }
         synchronized(callbacks) {
             val count = callbacks.beginBroadcast()
             try {

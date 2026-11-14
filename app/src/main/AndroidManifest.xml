@@ -205,6 +205,29 @@
             android:exported="false" />
 
         <!--
+            The launcher orb: the flag, the region and the subscription in a circle, the
+            connect button riding its bottom-right edge, the pinned servers — flags
+            alone — in squares along the top. Main process, next to the profile
+            database; ":core" tells it every state change with an explicit broadcast,
+            and its own tap actions travel the same receiver. Not exported: the
+            system's own widget delivery needs no exporter, and the tunnel toggles
+            stay unspoofable.
+        -->
+        <receiver
+            android:name="slop.miho.chumpy.widget.OrbWidget"
+            android:exported="false"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE_OPTIONS" />
+                <action android:name="slop.miho.chumpy.widget.REPAINT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_orb_info" />
+        </receiver>
+
+        <!--
             Serves the downloaded update APK to the system's package installer: the
             file stays in the app's own storage, the installer reads it through this
             grant, the APK never travels anywhere else.

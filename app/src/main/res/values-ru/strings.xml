@@ -317,4 +317,12 @@
     <string name="error_geodata_source_missing">В базе %1$s нет категорий %2$s, а подписка не указала адрес их загрузки. Обновите подписку или запросите базу у провайдера.</string>
     <string name="error_geodata_categories">База провайдера не содержит нужных категорий: %1$s.</string>
     <string name="error_geodata_download">Не удалось подготовить базу маршрутизации подписки: %1$s</string>
+
+    <!-- Виджет на рабочем столе (шар) -->
+    <string name="widget_name">Chumpy</string>
+    <string name="widget_description">Шар подключения: подключение, переключение закреплённых серверов и состояние.</string>
+    <string name="widget_connect">Подключить</string>
+    <string name="widget_disconnect">Отключить</string>
+    <string name="widget_setup">Настроить Chumpy</string>
+    <string name="widget_empty">Сервера ещё нет</string>
 </resources>

@@ -35,6 +35,7 @@ import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import slop.miho.chumpy.data.Accent
 import slop.miho.chumpy.data.FontRegistry
+import slop.miho.chumpy.data.SettingsStore
 import slop.miho.chumpy.data.ThemeMode
 import slop.miho.chumpy.data.UiSettings
 import slop.miho.chumpy.data.WallpaperPalette
@@ -167,6 +168,44 @@ fun themedIconColor(context: Context, settings: UiSettings): Int =
         darkTheme = true,
         context = context,
     ).primary.toArgb()
+
+/**
+ * The launcher widget's own little scheme, resolved outside composition: the widget
+ * draws with android.graphics, so the roles travel as ARGB ints. Built by the same
+ * [themeColorScheme] the interface wears — Wallpaper-seeded accents fall back to the
+ * sky hue the same way the QS tile's do, AMOLED deepens the containers, and the
+ * "adaptive" accent follows the system's Material You on devices that have it.
+ */
+class OrbWidgetColors(
+    val primary: Int,
+    val onPrimary: Int,
+    val secondaryContainer: Int,
+    val onSecondaryContainer: Int,
+    val surfaceContainerHighest: Int,
+    val onSurface: Int,
+    val onSurfaceVariant: Int,
+    val outline: Int,
+)
+
+fun orbWidgetColors(context: Context, darkTheme: Boolean): OrbWidgetColors {
+    val scheme = themeColorScheme(
+        settings = SettingsStore.settings(context).value,
+        monetHues = null,
+        rainbowHue = Accent.SKY.hue,
+        darkTheme = darkTheme,
+        context = context,
+    )
+    return OrbWidgetColors(
+        primary = scheme.primary.toArgb(),
+        onPrimary = scheme.onPrimary.toArgb(),
+        secondaryContainer = scheme.secondaryContainer.toArgb(),
+        onSecondaryContainer = scheme.onSecondaryContainer.toArgb(),
+        surfaceContainerHighest = scheme.surfaceContainerHighest.toArgb(),
+        onSurface = scheme.onSurface.toArgb(),
+        onSurfaceVariant = scheme.onSurfaceVariant.toArgb(),
+        outline = scheme.outline.toArgb(),
+    )
+}
 
 /**
  * The AMOLED take on a dark scheme: the background and the lowest surfaces go pure black,
