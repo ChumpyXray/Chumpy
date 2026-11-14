@@ -36,7 +36,7 @@ room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
-zxing-core = { module = "com.google.zxing:core", version = "3.5.3" }
+zxing-core = { module = "com.google.zxing:core", version = "3.5.4" }
 # The subscription logos' SVG half: a tiny pure-Java renderer, PNG decodes natively.
 androidsvg = { module = "com.caverock:androidsvg", version = "1.4" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camera" }
@@ -44,7 +44,7 @@ androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", versi
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camera" }
 jsr305 = "com.google.code.findbugs:jsr305:3.0.2"
 junit = "junit:junit:4.13.2"
-robolectric = "org.robolectric:robolectric:4.17"
+robolectric = "org.robolectric:robolectric:4.18"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
