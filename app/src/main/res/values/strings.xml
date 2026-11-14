@@ -325,4 +325,5 @@
     <string name="error_geodata_download">Could not prepare the subscription routing database: %1$s</string>
     <string name="per_app_search">Search apps</string>
     <string name="per_app_search_empty">No matching apps</string>
+    <string name="subscription_link_title">Add subscription?</string>
 </resources>

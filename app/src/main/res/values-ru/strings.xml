@@ -319,4 +319,5 @@
     <string name="error_geodata_download">Не удалось подготовить базу маршрутизации подписки: %1$s</string>
     <string name="per_app_search">Поиск приложений</string>
     <string name="per_app_search_empty">Приложения не найдены</string>
+    <string name="subscription_link_title">Добавить подписку?</string>
 </resources>
