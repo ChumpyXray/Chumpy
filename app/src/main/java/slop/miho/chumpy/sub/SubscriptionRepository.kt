@@ -1,5 +1,6 @@
 package slop.miho.chumpy.sub
 
+import android.app.Application
 import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
@@ -37,11 +38,13 @@ import java.util.concurrent.TimeUnit
  * interval taken from the panel's `profile-update-interval` header when present.
  */
 class SubscriptionRepository(
-    private val context: Context,
+    context: Context,
     private val db: ChumpyDatabase,
     private val tunnelUp: () -> Boolean,
     private val happSpoof: () -> HappSpoof.Fingerprint?,
 ) {
+    private val context: Application = context.applicationContext as Application
+
     private companion object {
         const val TAG = "Chumpy/SubRepo"
         const val DEFAULT_UPDATE_HOURS = 24L
