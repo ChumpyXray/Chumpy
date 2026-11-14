@@ -1,5 +1,6 @@
 package slop.miho.chumpy.ui.main
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -2087,7 +2088,7 @@ private fun ExternalLinkRow(
         supporting = supporting,
         icon = icon,
     ) {
-        context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
     }
 }
 

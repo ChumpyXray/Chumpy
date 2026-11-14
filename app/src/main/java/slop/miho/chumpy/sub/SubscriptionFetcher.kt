@@ -1,5 +1,6 @@
 package slop.miho.chumpy.sub
 
+import androidx.core.net.toUri
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -215,7 +216,7 @@ class SubscriptionFetcher(
 
     /** The link host of a subscription URL — the fallback display name. */
     fun hostNameOf(rawUrl: String): String = try {
-        Uri.parse(normalizeUrl(rawUrl)).host ?: rawUrl
+        normalizeUrl(rawUrl).toUri().host ?: rawUrl
     } catch (_: Exception) {
         rawUrl
     }

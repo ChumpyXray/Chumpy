@@ -1,5 +1,6 @@
 package slop.miho.chumpy.core
 
+import androidx.core.graphics.createBitmap
 import android.app.PendingIntent
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -151,7 +152,7 @@ class QuickTileService : TileService() {
         val drawable = getDrawable(R.drawable.ic_tile_inverted)!!.mutate()
         drawable.setTint(color)
         val size = 512
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(size, size)
         val canvas = Canvas(bitmap)
         drawable.setBounds(0, 0, size, size)
         drawable.draw(canvas)

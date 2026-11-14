@@ -1,5 +1,7 @@
 package slop.miho.chumpy.ui.wallpapers
 
+import androidx.core.graphics.scale
+import androidx.core.graphics.get
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -418,7 +420,7 @@ private fun decodeWallpaperUncached(file: File): DecodedWallpaper? {
     while (y < bitmap.height) {
         var x = 0
         while (x < bitmap.width) {
-            val pixel = Color(bitmap.getPixel(x, y))
+            val pixel = Color(bitmap[x, y])
             if (pixel.alpha > 0f) {
                 sum += pixel.luminance()
                 samples++
@@ -435,8 +437,7 @@ private fun decodeWallpaperUncached(file: File): DecodedWallpaper? {
     val pixels = bitmap.width.toLong() * bitmap.height
     if (pixels > MAX_DECODE_PIXELS) {
         val shrink = kotlin.math.sqrt(MAX_DECODE_PIXELS.toDouble() / pixels)
-        replace(Bitmap.createScaledBitmap(
-            bitmap,
+        replace(bitmap.scale(
             (bitmap.width * shrink).roundToInt().coerceAtLeast(1),
             (bitmap.height * shrink).roundToInt().coerceAtLeast(1),
             true,

@@ -1,5 +1,6 @@
 package slop.miho.chumpy.ui.main
 
+import androidx.core.graphics.createBitmap
 import android.content.Intent
 
 import androidx.activity.compose.BackHandler
@@ -1021,7 +1022,7 @@ private fun decodeSvgLogo(bytes: ByteArray): ImageBitmap? = try {
     val scale = minOf(1f, cap / picture.width.toFloat(), cap / picture.height.toFloat())
     val width = (picture.width * scale).roundToInt().coerceAtLeast(1)
     val height = (picture.height * scale).roundToInt().coerceAtLeast(1)
-    val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(width, height)
     android.graphics.Canvas(bitmap).apply {
         scale(scale, scale)
         drawPicture(picture)
