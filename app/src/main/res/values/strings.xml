@@ -130,7 +130,6 @@
     <string name="settings_accent_rainbow">Rainbow</string>
     <string name="settings_accent_custom">Custom</string>
     <string name="settings_accent_custom_title">Custom color</string>
-    <string name="settings_accent_custom_hex">Hex color</string>
     <string name="settings_accent_custom_pick">Pick</string>
     <string name="settings_slow_animations">Slow animations</string>
     <string name="settings_slow_animations_hint">Springs get softer, everything moves slower</string>

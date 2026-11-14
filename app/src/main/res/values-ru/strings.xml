@@ -130,7 +130,6 @@
     <string name="settings_accent_rainbow">Радужный</string>
     <string name="settings_accent_custom">Свой</string>
     <string name="settings_accent_custom_title">Свой цвет</string>
-    <string name="settings_accent_custom_hex">HEX-цвет</string>
     <string name="settings_accent_custom_pick">Выбрать</string>
     <string name="settings_slow_animations">Медленные анимации</string>
     <string name="settings_slow_animations_hint">Движения становятся плавнее, слегка пружинее</string>
