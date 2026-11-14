@@ -13,7 +13,7 @@ coreKtx = "1.18.0"
 room = "2.8.5"
 work = "2.12.0"
 serialization = "1.11.0"
-camera = "1.4.2"
+camera = "1.6.2"
 
 [libraries]
 androidx-exifinterface = "androidx.exifinterface:exifinterface:1.4.2"
