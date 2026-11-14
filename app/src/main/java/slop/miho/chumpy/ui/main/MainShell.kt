@@ -142,7 +142,6 @@ fun MainShell(viewModel: MainViewModel) {
     val subscriptions by viewModel.subscriptions.collectAsStateWithLifecycle()
     val selectedSubscription by viewModel.selectedSubscription.collectAsStateWithLifecycle()
     val servers by viewModel.servers.collectAsStateWithLifecycle()
-    val home by viewModel.home.collectAsStateWithLifecycle()
     val update by viewModel.update.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
 
@@ -423,7 +422,7 @@ fun MainShell(viewModel: MainViewModel) {
                     subscriptions = subscriptions,
                     selectedSubscription = selectedSubscription,
                     servers = servers,
-                    home = home,
+                    homeFlow = viewModel.home,
                     update = update,
                     statsFlow = viewModel.stats,
                     manualProfileCount = viewModel.manualProfileCount,
@@ -482,7 +481,7 @@ fun MainShell(viewModel: MainViewModel) {
                     selectedSubscription = selectedSubscription,
                     tunnelStatus = tunnelStatus,
                     servers = servers,
-                    home = home,
+                    homeFlow = viewModel.home,
                     update = update,
                     // The flow itself, not its value: it ticks once a second, and the STATS page
                     // collects it in its own branch rather than recomposing the whole shell.
@@ -711,7 +710,7 @@ private fun ShellDestinationPage(
     subscriptions: List<slop.miho.chumpy.db.SubscriptionEntity>,
     selectedSubscription: slop.miho.chumpy.db.SubscriptionEntity?,
     servers: ServersUiState,
-    home: HomeUiState,
+    homeFlow: StateFlow<HomeUiState>,
     update: UpdateUiState,
     statsFlow: StateFlow<StatsUiState>,
     manualProfileCount: StateFlow<Int>,
@@ -747,7 +746,7 @@ private fun ShellDestinationPage(
         when (val tab = MainTab.entries[position]) {
             MainTab.HOME -> HomeScreen(
                 status = tunnelStatus,
-                home = home,
+                home = homeFlow.collectOnStageAsState().value,
                 update = update,
                 visible = homeVisible,
                 onRefreshPing = onRefreshPing,
@@ -853,7 +852,7 @@ private fun TwoPaneShell(
     subscriptions: List<slop.miho.chumpy.db.SubscriptionEntity>,
     selectedSubscription: slop.miho.chumpy.db.SubscriptionEntity?,
     servers: ServersUiState,
-    home: HomeUiState,
+    homeFlow: StateFlow<HomeUiState>,
     update: UpdateUiState,
     statsFlow: StateFlow<StatsUiState>,
     manualProfileCount: StateFlow<Int>,
@@ -907,7 +906,7 @@ private fun TwoPaneShell(
             CompositionLocalProvider(LocalBarReservedHeight provides FloatingBottomBarReservedHeight) {
                 HomeScreen(
                     status = tunnelStatus,
-                    home = home,
+                    home = homeFlow.collectAsStateWithLifecycle().value,
                     update = update,
                     visible = true,
                     onRefreshPing = onRefreshPing,
@@ -944,7 +943,7 @@ private fun TwoPaneShell(
                     selectedSubscription = selectedSubscription,
                     tunnelStatus = tunnelStatus,
                     servers = servers,
-                    home = home,
+                    homeFlow = homeFlow,
                     update = update,
                     statsFlow = statsFlow,
                     manualProfileCount = manualProfileCount,
@@ -1025,7 +1024,7 @@ private fun MainPagerStrip(
     selectedSubscription: slop.miho.chumpy.db.SubscriptionEntity?,
     tunnelStatus: TunnelStatus,
     servers: ServersUiState,
-    home: HomeUiState,
+    homeFlow: StateFlow<HomeUiState>,
     update: UpdateUiState,
     statsFlow: StateFlow<StatsUiState>,
     manualProfileCount: StateFlow<Int>,
@@ -1152,7 +1151,7 @@ private fun MainPagerStrip(
                     subscriptions = subscriptions,
                     selectedSubscription = selectedSubscription,
                     servers = servers,
-                    home = home,
+                    homeFlow = homeFlow,
                     update = update,
                     statsFlow = statsFlow,
                     manualProfileCount = manualProfileCount,
