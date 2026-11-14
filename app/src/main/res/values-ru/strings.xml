@@ -187,7 +187,12 @@
     <string name="connection_bypass_lan_on">Локальный трафик идёт мимо VPN, как будто его нет</string>
     <string name="connection_bypass_lan_off">Всё идёт через туннель, включая локалку</string>
     <string name="settings_background_refresh">Фоновое обновление</string>
-    <string name="settings_background_refresh_count">Автообновление подписок: %d</string>
+    <plurals name="settings_background_refresh_count">
+        <item quantity="one">Автообновление %d подписки</item>
+        <item quantity="few">Автообновление %d подписок</item>
+        <item quantity="many">Автообновление %d подписок</item>
+        <item quantity="other">Автообновление %d подписки</item>
+    </plurals>
     <string name="settings_about_core">Ядро Xray</string>
     <string name="settings_about_core_running">работает</string>
     <string name="settings_about_core_not_running">остановлено</string>

@@ -1247,8 +1247,9 @@ fun ConnectionScreen(
                         BackgroundRefreshRow(
                             supporting = when {
                                 autoCount == 0 -> stringResource(R.string.per_app_disabled)
-                                else -> stringResource(
-                                    R.string.settings_background_refresh_count,
+                                else -> pluralStringResource(
+                                    R.plurals.settings_background_refresh_count,
+                                    autoCount,
                                     autoCount,
                                 )
                             },

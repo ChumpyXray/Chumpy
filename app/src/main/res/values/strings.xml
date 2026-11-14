@@ -187,7 +187,10 @@
     <string name="connection_bypass_lan_on">LAN traffic rides the physical network, as if the VPN were off</string>
     <string name="connection_bypass_lan_off">Everything goes through the tunnel, the LAN included</string>
     <string name="settings_background_refresh">Background refresh</string>
-    <string name="settings_background_refresh_count">Auto-updates %d subscriptions</string>
+    <plurals name="settings_background_refresh_count">
+        <item quantity="one">Auto-updates %d subscription</item>
+        <item quantity="other">Auto-updates %d subscriptions</item>
+    </plurals>
     <string name="settings_about_core">Xray core</string>
     <string name="settings_about_core_running">running</string>
     <string name="settings_about_core_not_running">stopped</string>
