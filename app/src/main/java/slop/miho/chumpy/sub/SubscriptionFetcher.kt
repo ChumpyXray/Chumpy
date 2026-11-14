@@ -96,7 +96,8 @@ class SubscriptionFetcher(
                             .use { stream -> stream.readNBytesCompat(MAX_BODY_BYTES) }
                         val body = String(bytes, Charsets.UTF_8)
                         if (body.isBlank()) throw IOException("Empty subscription body")
-                        FetchResult(body, SubscriptionHeaders.parse(it.headers.toMultimap()))
+                        val decoded = SubscriptionParser.decodeBody(body)
+                        FetchResult(decoded, SubscriptionHeaders.parseResponse(it.headers.toMultimap(), decoded))
                     }
                     if (continuation.isActive) continuation.resume(result)
                 } catch (e: Exception) {
