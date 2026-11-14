@@ -3,7 +3,7 @@ package slop.miho.chumpy.ui.main
 import androidx.core.graphics.createBitmap
 import android.content.Intent
 import androidx.core.net.toUri
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalIconButton
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
@@ -382,13 +382,6 @@ fun ServersScreen(
                         onToggle = { dropdownOpen = !dropdownOpen }, onUpdate = onUpdate)
                 }
             }
-            selectedSubscription?.let { subscription ->
-                if (subscription.announcement != null || subscription.supportUrl != null || subscription.webPageUrl != null) {
-                    item(key = "subscription details") {
-                        SubscriptionDetails(subscription)
-                    }
-                }
-            }
             item(key = "header") {
                 Column(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
                     if (foldShown() > 0f) {
@@ -669,36 +662,49 @@ private fun ServersHeader(
  */
 private val LocalSubscriptionUpdateFocus = androidx.compose.runtime.staticCompositionLocalOf<FocusRequester?> { null }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SubscriptionDetails(subscription: SubscriptionEntity) {
-    val context = LocalContext.current
-    Surface(
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer.withSurfaceOpacity(),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+private fun SubscriptionDetails(subscription: SubscriptionEntity, supportingColor: Color) {
+    if (subscription.announcement == null && subscription.supportUrl == null && subscription.webPageUrl == null) return
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            subscription.announcement?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.controllerReadFocus())
-            }
-            if (subscription.supportUrl != null || subscription.webPageUrl != null) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    subscription.supportUrl?.let { url ->
-                        OutlinedButton(
-                            onClick = { context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) } },
-                            modifier = Modifier.focusRing(inset = true),
-                        ) { Text(stringResource(R.string.subscription_support)) }
-                    }
-                    subscription.webPageUrl?.let { url ->
-                        OutlinedButton(
-                            onClick = { context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) } },
-                            modifier = Modifier.focusRing(inset = true),
-                        ) { Text(stringResource(R.string.subscription_website)) }
-                    }
+        subscription.announcement?.let { announcement ->
+            Text(
+                text = announcement,
+                color = supportingColor,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.controllerReadFocus(),
+            )
+        }
+        if (subscription.webPageUrl != null || subscription.supportUrl != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                subscription.webPageUrl?.let { url ->
+                    SubscriptionLinkButton(url, R.drawable.ic_public, R.string.subscription_website)
+                }
+                subscription.supportUrl?.let { url ->
+                    SubscriptionLinkButton(url, R.drawable.ic_person, R.string.subscription_support)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SubscriptionLinkButton(url: String, icon: Int, description: Int) {
+    val context = LocalContext.current
+    val uri = remember(url) { url.toUri() }
+    val glyph = when (uri.host?.lowercase()) {
+        "t.me", "telegram.me", "telegram.dog", "www.t.me", "www.telegram.me", "www.telegram.dog" -> R.drawable.ic_telegram
+        else -> icon
+    }
+    FilledTonalIconButton(
+        onClick = { context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) } },
+        modifier = Modifier.size(48.dp).focusRing(circular = true, inset = true, gap = 1.dp),
+        shape = CircleShape,
+    ) {
+        Icon(painterResource(glyph), contentDescription = stringResource(description))
     }
 }
 
@@ -795,35 +801,38 @@ private fun SubscriptionCard(
                             daysTitle(sub.expireEpochSeconds) != null ||
                             consumedText(sub) != null
                         )
-                    AnimatedContent(
-                        targetState = hasReport,
-                        transitionSpec = {
-                            ContentTransform(
-                                targetContentEnter = fadeIn(motion.defaultEffectsSpec()),
-                                initialContentExit = fadeOut(motion.defaultEffectsSpec()),
-                                sizeTransform = SizeTransform(clip = false),
-                            )
-                        },
-                        label = "subscription report stance",
-                    ) { full ->
-                        if (full && sub != null) {
-                            SubscriptionReportFace(
-                                subscription = sub,
-                                isUpdating = isUpdating,
-                                week = week,
-                                contentColor = contentColor,
-                                supportingColor = supportingColor,
-                                onUpdate = onUpdate,
-                            )
-                        } else {
-                            SubscriptionCompactFace(
-                                subscription = sub,
-                                isUpdating = isUpdating,
-                                contentColor = contentColor,
-                                supportingColor = supportingColor,
-                                onUpdate = onUpdate,
-                            )
+                    Column {
+                        AnimatedContent(
+                            targetState = hasReport,
+                            transitionSpec = {
+                                ContentTransform(
+                                    targetContentEnter = fadeIn(motion.defaultEffectsSpec()),
+                                    initialContentExit = fadeOut(motion.defaultEffectsSpec()),
+                                    sizeTransform = SizeTransform(clip = false),
+                                )
+                            },
+                            label = "subscription report stance",
+                        ) { full ->
+                            if (full && sub != null) {
+                                SubscriptionReportFace(
+                                    subscription = sub,
+                                    isUpdating = isUpdating,
+                                    week = week,
+                                    contentColor = contentColor,
+                                    supportingColor = supportingColor,
+                                    onUpdate = onUpdate,
+                                )
+                            } else {
+                                SubscriptionCompactFace(
+                                    subscription = sub,
+                                    isUpdating = isUpdating,
+                                    contentColor = contentColor,
+                                    supportingColor = supportingColor,
+                                    onUpdate = onUpdate,
+                                )
+                            }
                         }
+                        if (sub != null) SubscriptionDetails(sub, supportingColor)
                     }
                 }
             }
