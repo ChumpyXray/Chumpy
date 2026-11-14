@@ -987,12 +987,24 @@ private fun decodeLogoBytes(path: String): ImageBitmap? = try {
         // PNG's own signature.
         bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() &&
             bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte() ->
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            decodePngLogo(bytes)
         // Everything angle-bracketed is SVG here; the refresh already vetted the body.
         else -> decodeSvgLogo(bytes)
     }
 } catch (_: Exception) {
     null
+}
+
+private fun decodePngLogo(bytes: ByteArray): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    while (bounds.outWidth.toLong() > 512L * sample || bounds.outHeight.toLong() > 512L * sample) {
+        sample *= 2
+    }
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
 }
 
 private fun decodeSvgLogo(bytes: ByteArray): ImageBitmap? = try {
