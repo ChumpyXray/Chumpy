@@ -112,6 +112,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -666,27 +668,35 @@ private val LocalSubscriptionUpdateFocus = androidx.compose.runtime.staticCompos
 private fun SubscriptionDetails(subscription: SubscriptionEntity, supportingColor: Color) {
     if (subscription.announcement == null && subscription.supportUrl == null && subscription.webPageUrl == null) return
 
-    Column(
+    val hasLinks = subscription.webPageUrl != null || subscription.supportUrl != null
+    val gap = if (subscription.announcement != null && hasLinks) 8.dp else 0.dp
+    Row(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        subscription.announcement?.let { announcement ->
+        if (hasLinks) {
+            subscription.webPageUrl?.let { url ->
+                SubscriptionLinkButton(url, R.drawable.ic_public, R.string.subscription_website)
+            } ?: Spacer(Modifier.width(48.dp))
+        }
+        val center = Modifier.weight(1f)
+        val announcement = subscription.announcement
+        if (announcement != null) {
             Text(
                 text = announcement,
                 color = supportingColor,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.controllerReadFocus(),
+                style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Paragraph),
+                textAlign = TextAlign.Center,
+                modifier = center.controllerReadFocus(),
             )
+        } else {
+            Spacer(center)
         }
-        if (subscription.webPageUrl != null || subscription.supportUrl != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                subscription.webPageUrl?.let { url ->
-                    SubscriptionLinkButton(url, R.drawable.ic_public, R.string.subscription_website)
-                }
-                subscription.supportUrl?.let { url ->
-                    SubscriptionLinkButton(url, R.drawable.ic_person, R.string.subscription_support)
-                }
-            }
+        if (hasLinks) {
+            subscription.supportUrl?.let { url ->
+                SubscriptionLinkButton(url, R.drawable.ic_person, R.string.subscription_support)
+            } ?: Spacer(Modifier.width(48.dp))
         }
     }
 }
