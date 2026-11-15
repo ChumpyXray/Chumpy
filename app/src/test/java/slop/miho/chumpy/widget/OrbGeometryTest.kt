@@ -1,39 +1,62 @@
 package slop.miho.chumpy.widget
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.hypot
 import kotlin.math.sqrt
 
 /**
- * The orb's own law, spelled in the provider's card and asserted here: the connect
- * button's center sits on the orb's rim, and its bounding box stays flush with the
- * hitbox's bottom-right corner — whatever the widget is stretched to.
+ * The orb's own laws, spelled in the renderer's geometry helpers and asserted here:
+ * nothing is measured off the widget's box — that box is never quite square — but off
+ * the orb alone, so circles stay circles and squares stay squares at any stretch the
+ * widget is resized to.
  */
 class OrbGeometryTest {
 
     @Test
-    fun `the square widget's button box is flush with the hitbox corner and its center rides the rim`() {
-        val w = 300f
-        val d = WidgetRenderer.buttonDiameter(w, w, w)
-        // The clean square answer: d = W·(1 − 1/√2).
-        assertEquals(w * (1f - 1f / sqrt(2f)), d, 0.01f)
-        // The center lands exactly on the rim: the distance from the orb's middle to
-        // the button's center is the orb's radius.
-        val dx = w - d / 2f - w / 2f
-        val dy = w - d / 2f - w / 2f
-        assertEquals(w / 2f, sqrt(dx * dx + dy * dy), 0.01f)
-        // The box is flush: the button's box spans the hitbox's last d pixels on both axes.
-        assertEquals(w, d + 2f * dx, 0.01f)
+    fun `the button keeps its size against the orb and rides the rim`() {
+        for ((w, h) in listOf(300f to 300f, 250f to 170f, 150f to 200f)) {
+            val box = WidgetRenderer.buttonBox(w, h)
+            val side = minOf(w, h)
+            // The diameter is a share of the orb alone — resize the box and the button
+            // scales with the circle, never with the stretch.
+            assertEquals(WidgetRenderer.BUTTON_SHARE * side, box.width(), 0.01f)
+            assertEquals(WidgetRenderer.BUTTON_SHARE * side, box.height(), 0.01f)
+            // The center rides the rim: its distance from the orb's middle is the radius.
+            val dx = box.centerX() - w / 2f
+            val dy = box.centerY() - h / 2f
+            assertEquals(side / 2f, hypot(dx, dy), 0.01f)
+        }
     }
 
     @Test
-    fun `a stretched widget keeps the center on the rim`() {
-        val w = 400f
-        val h = 300f
-        val d = WidgetRenderer.buttonDiameter(w, h, h)
-        val dx = w - d / 2f - w / 2f
-        val dy = h - d / 2f - h / 2f
-        assertEquals(h / 2f, sqrt(dx * dx + dy * dy), 0.01f)
+    fun `a square widget keeps the classic corner-badge fit`() {
+        val w = 300f
+        val box = WidgetRenderer.buttonBox(w, w)
+        // The clean square answer: d = W·(1 − 1/√2), the center on the rim and the
+        // box flush with the hitbox's bottom-right corner.
+        assertEquals(w * (1f - 1f / sqrt(2f)), box.width(), 0.01f)
+        assertEquals(w, box.right + 0f, 0.01f)
+        assertEquals(w, box.bottom + 0f, 0.01f)
+    }
+
+    @Test
+    fun `the pins stay square whatever the widget is stretched to`() {
+        for ((w, h) in listOf(300f to 300f, 250f to 170f, 150f to 200f)) {
+            val orb = WidgetRenderer.orbBox(w, h)
+            for (count in 1..5) {
+                for (slot in 0 until count) {
+                    val rect = WidgetRenderer.pinRect(w, h, count, slot)!!
+                    // A square in pixels, both axes — never a rectangle of the stretch.
+                    assertEquals(rect.width(), rect.height(), 0.01f)
+                    // The row rides the orb's own top-left corner, not the box's.
+                    assertTrue(rect.left >= orb.left - 0.01f)
+                    assertTrue(rect.top >= orb.top - 0.01f)
+                    assertTrue(rect.right <= orb.right + 0.01f)
+                }
+            }
+        }
     }
 
     @Test
@@ -48,12 +71,12 @@ class OrbGeometryTest {
         assertEquals(0.215f, side(4), 0.0001f)
         assertEquals(0.168f, side(5), 0.0001f)
         // Whatever the count, the row fits: margin, tiles, gaps, and the far margin
-        // never run past the widget's edge.
+        // never run past the orb's side.
         for (n in 1..5) {
             val right = 2 * WidgetRenderer.PinRow.MARGIN +
                 n * side(n) +
                 (n - 1) * WidgetRenderer.PinRow.GAP
-            org.junit.Assert.assertTrue("row of $n runs past the edge", right <= 1.000001f)
+            assertTrue("row of $n runs past the edge", right <= 1.000001f)
         }
     }
 }

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.VpnService
+import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,7 +39,8 @@ import slop.miho.chumpy.xray.XrayConfigBuilder
  * The launcher widget: the orb with the flag, the region and the subscription in its
  * middle, the connect button riding its bottom-right edge, and the pinned servers —
  * flags alone — in squares along the top. The whole picture is one bitmap
- * ([WidgetRenderer]); the taps land on invisible zones laid out to the same proportions.
+ * ([WidgetRenderer]); the taps land on invisible zone views the provider frames to
+ * the very pixel boxes that picture paints.
  *
  * The widget lives in the main process, next to the profile database and the repository,
  * and talks to the tunnel the way everything else does. The ":core" process announces
@@ -164,7 +166,7 @@ class OrbWidget : AppWidgetProvider() {
         for (id in ids) {
             val (width, height) = sizeOf(context, manager, id) ?: continue
             val bitmap = WidgetRenderer.render(context, width, height, state, face, pins, colors)
-            manager.updateAppWidget(id, buildViews(context, bitmap, state, pins))
+            manager.updateAppWidget(id, buildViews(context, bitmap, state, pins, width, height))
         }
     }
 
@@ -173,6 +175,8 @@ class OrbWidget : AppWidgetProvider() {
         bitmap: android.graphics.Bitmap,
         state: TunnelState,
         pins: List<WidgetPin>,
+        width: Int,
+        height: Int,
     ): android.widget.RemoteViews {
         val views = android.widget.RemoteViews(context.packageName, R.layout.widget_orb)
         views.setImageViewBitmap(R.id.wgt_visual, bitmap)
@@ -206,52 +210,78 @@ class OrbWidget : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.wgt_button, open)
             views.setContentDescription(R.id.wgt_button, context.getString(R.string.widget_setup))
         }
-        // The pins: a tap picks its server. The zone layout keeps a prepared row per
-        // count (the painted row's own size depends on how many pins it holds), so the
-        // matching one is shown and carries the taps; every other count stays hidden,
-        // and the whole rest of the widget falls through to the open-the-app base.
+        // The pins: a tap picks its server; a slot the row doesn't hold is gone, its
+        // corner falling back through to the open-the-app base underneath.
         val shown = pins.size.coerceIn(0, WidgetRenderer.PIN_SLOTS)
-        for (count in 1..WidgetRenderer.PIN_SLOTS) {
-            views.setViewVisibility(
-                groupId(count),
-                if (count == shown) android.view.View.VISIBLE else android.view.View.GONE,
-            )
-        }
-        for (slot in 0 until shown) {
-            val pin = pins[slot]
+        for (slot in 0 until WidgetRenderer.PIN_SLOTS) {
+            val viewId = pinId(slot)
+            val pin = pins.getOrNull(slot)
+            if (slot >= shown || pin == null) {
+                views.setViewVisibility(viewId, android.view.View.GONE)
+                continue
+            }
+            views.setViewVisibility(viewId, android.view.View.VISIBLE)
             views.setOnClickPendingIntent(
-                pinId(shown, slot),
+                viewId,
                 broadcast(context, ACTION_PICK, REQUEST_PIN_BASE + slot, pin.id),
             )
-            views.setContentDescription(pinId(shown, slot), pin.label)
+            views.setContentDescription(viewId, pin.label)
+            frameZone(context, views, width, height, viewId) { w, h -> WidgetRenderer.pinRect(w, h, shown, slot) }
         }
+        // The zones follow the paint pixel for pixel — Android 12's setViewLayout
+        // family; a pre-12 launcher keeps the layout's static fallback sizes.
+        frameZone(context, views, width, height, R.id.wgt_button) { w, h -> WidgetRenderer.buttonBox(w, h) }
         return views
     }
 
-    private fun groupId(count: Int): Int = when (count) {
-        1 -> R.id.wgt_pins_1
-        2 -> R.id.wgt_pins_2
-        3 -> R.id.wgt_pins_3
-        4 -> R.id.wgt_pins_4
-        else -> R.id.wgt_pins_5
+    /**
+     * Frames a zone view to the painter's own box: the width and height come straight
+     * from the geometry, the margins from the box's distance to the frame's edges —
+     * the button pinned to the bottom-right corner, the pins to the top-left. All in
+     * exact pixels; the exact-zone setters exist only on Android 12 and up.
+     */
+    private fun frameZone(
+        context: Context,
+        views: android.widget.RemoteViews,
+        width: Int,
+        height: Int,
+        viewId: Int,
+        box: (Float, Float) -> WidgetRenderer.FrameF?,
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val rect = box(width.toFloat(), height.toFloat()) ?: return
+        // The setters take their value in dp, so the exact pixels travel through the
+        // density unchanged — the zone lands on the very box the painter drew.
+        val density = context.resources.displayMetrics.density
+        fun dp(px: Float) = px / density
+        views.setViewLayoutWidth(viewId, dp(rect.width()), android.util.TypedValue.COMPLEX_UNIT_DIP)
+        views.setViewLayoutHeight(viewId, dp(rect.height()), android.util.TypedValue.COMPLEX_UNIT_DIP)
+        // All four margins, so whichever corner the zone is pinned to, its far edges
+        // land on the same box the painter drew.
+        views.setViewLayoutMargin(
+            viewId, android.widget.RemoteViews.MARGIN_START,
+            dp(rect.left), android.util.TypedValue.COMPLEX_UNIT_DIP,
+        )
+        views.setViewLayoutMargin(
+            viewId, android.widget.RemoteViews.MARGIN_TOP,
+            dp(rect.top), android.util.TypedValue.COMPLEX_UNIT_DIP,
+        )
+        views.setViewLayoutMargin(
+            viewId, android.widget.RemoteViews.MARGIN_END,
+            dp(width - rect.right), android.util.TypedValue.COMPLEX_UNIT_DIP,
+        )
+        views.setViewLayoutMargin(
+            viewId, android.widget.RemoteViews.MARGIN_BOTTOM,
+            dp(height - rect.bottom), android.util.TypedValue.COMPLEX_UNIT_DIP,
+        )
     }
 
-    private fun pinId(count: Int, slot: Int): Int = when (count * 10 + slot) {
-        10 -> R.id.wgt_pin_1_0
-        20 -> R.id.wgt_pin_2_0
-        21 -> R.id.wgt_pin_2_1
-        30 -> R.id.wgt_pin_3_0
-        31 -> R.id.wgt_pin_3_1
-        32 -> R.id.wgt_pin_3_2
-        40 -> R.id.wgt_pin_4_0
-        41 -> R.id.wgt_pin_4_1
-        42 -> R.id.wgt_pin_4_2
-        43 -> R.id.wgt_pin_4_3
-        50 -> R.id.wgt_pin_5_0
-        51 -> R.id.wgt_pin_5_1
-        52 -> R.id.wgt_pin_5_2
-        53 -> R.id.wgt_pin_5_3
-        else -> R.id.wgt_pin_5_4
+    private fun pinId(slot: Int): Int = when (slot) {
+        0 -> R.id.wgt_pin_0
+        1 -> R.id.wgt_pin_1
+        2 -> R.id.wgt_pin_2
+        3 -> R.id.wgt_pin_3
+        else -> R.id.wgt_pin_4
     }
 
     private fun broadcast(context: Context, action: String, requestCode: Int, profileId: String?): PendingIntent =

@@ -1,26 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The launcher orb's whole frame: the painted picture (wgt_visual), and over it the
-    invisible touch zones whose layout weights carve the widget into the very
-    proportions WidgetRenderer paints. Under everything sits wgt_orb — one full-size
-    zone that opens the app; every layer above it is click-through wherever it carries
-    no click of its own.
+    The launcher orb's whole frame: the painted picture (wgt_visual) under invisible
+    touch zones, every zone its own view pinned to the frame's edges — the button at
+    the bottom-right corner, the pin slots along the top-left. The provider frames
+    each zone to the exact pixel box WidgetRenderer paints (setViewLayoutWidth and
+    friends, Android 12+); the sizes and margins below are only the static fallback
+    a pre-12 launcher inflates before the first frame arrives.
 
-    The pinned row's size depends on how many pins it holds (a crowded row squeezes),
-    so the layout keeps a prepared row per count — wgt_pins_1 .. wgt_pins_5 — and the
-    provider shows exactly the one matching the paint. The rows' weights spell the
-    same shares WidgetRenderer.PinRow does: a margin off the top-left corner, then the
-    tiles with small gaps between them. The connect button's corner stays as it was,
-    its zone carved around the hitbox's bottom-right corner.
+    fitCenter on the picture: the host's size is an estimate, and when the real box
+    drifts from it the picture shrinks a uniform step instead of deforming — the
+    orb stays round whatever the launcher reports.
+
+    Under everything sits wgt_orb — one full-size zone that opens the app; the zones
+    themselves carry no visuals at all, so wherever one holds no click of its own the
+    tap falls through to it.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- fitCenter, not fitXY: the host's size is an estimate, and when the real box
-         drifts from it, fitXY would squash the circles into ellipses on resize.
-         fitCenter shrinks the whole picture a uniform step instead — the orb stays
-         round whatever the launcher reports. -->
     <ImageView
         android:id="@+id/wgt_visual"
         android:layout_width="match_parent"
@@ -34,353 +32,57 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- The connect button's zone: the hitbox's bottom-right corner. -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+    <!-- The connect button's zone, pinned to the bottom-right corner. -->
+    <ImageView
+        android:id="@+id/wgt_button"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:layout_gravity="bottom|end"
+        android:contentDescription="@null" />
 
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="707" />
+    <!-- The pinned slots' zones, along the top-left corner, one per slot. -->
+    <ImageView
+        android:id="@+id/wgt_pin_0"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="6dp"
+        android:layout_marginTop="6dp"
+        android:contentDescription="@null" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="293"
-            android:orientation="horizontal">
+    <ImageView
+        android:id="@+id/wgt_pin_1"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="45dp"
+        android:layout_marginTop="6dp"
+        android:contentDescription="@null" />
 
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="707" />
+    <ImageView
+        android:id="@+id/wgt_pin_2"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="84dp"
+        android:layout_marginTop="6dp"
+        android:contentDescription="@null" />
 
-            <ImageView
-                android:id="@+id/wgt_button"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="293" />
-        </LinearLayout>
-    </LinearLayout>
+    <ImageView
+        android:id="@+id/wgt_pin_3"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="123dp"
+        android:layout_marginTop="6dp"
+        android:contentDescription="@null" />
 
-    <!-- One pin. -->
-    <LinearLayout
-        android:id="@+id/wgt_pins_1"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="4" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="23"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_1_0"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="23" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="73" />
-        </LinearLayout>
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="73" />
-    </LinearLayout>
-
-    <!-- Two pins. -->
-    <LinearLayout
-        android:id="@+id/wgt_pins_2"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="4" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="23"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_2_0"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="23" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_2_1"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="23" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="48" />
-        </LinearLayout>
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="73" />
-    </LinearLayout>
-
-    <!-- Three pins. -->
-    <LinearLayout
-        android:id="@+id/wgt_pins_3"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="4" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="23"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_3_0"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="23" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_3_1"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="23" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_3_2"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="23" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="23" />
-        </LinearLayout>
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="73" />
-    </LinearLayout>
-
-    <!-- Four pins — the row starts to squeeze. -->
-    <LinearLayout
-        android:id="@+id/wgt_pins_4"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="4" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="21.5"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_4_0"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="21.5" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_4_1"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="21.5" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_4_2"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="21.5" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_4_3"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="21.5" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4" />
-        </LinearLayout>
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="74.5" />
-    </LinearLayout>
-
-    <!-- Five pins — the row at its tightest. -->
-    <LinearLayout
-        android:id="@+id/wgt_pins_5"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="4" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="16.8"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_5_0"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="16.8" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_5_1"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="16.8" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_5_2"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="16.8" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_5_3"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="16.8" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="2" />
-
-            <ImageView
-                android:id="@+id/wgt_pin_5_4"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="16.8" />
-
-            <ImageView
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="4" />
-        </LinearLayout>
-
-        <ImageView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="79.2" />
-    </LinearLayout>
+    <ImageView
+        android:id="@+id/wgt_pin_4"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="162dp"
+        android:layout_marginTop="6dp"
+        android:contentDescription="@null" />
 </FrameLayout>

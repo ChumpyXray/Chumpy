@@ -43,20 +43,19 @@ data class WidgetPin(
 
 /**
  * The whole launcher widget, drawn into one bitmap. RemoteViews can do neither the
- * geometry nor the type: the connect button sits half inside the orb with its center on
- * the rim and its box flush with the hitbox's corner, the pin squares ride the top edge
- * the same way, and the flags want the bundled Twemoji font — none of which an
- * ImageView-with-text arrives at. Drawing it all ourselves also keeps the interactive
- * zones honest: the provider overlays invisible views whose layout weights carve the
- * widget into the same proportions these paints draw, so the two never drift apart.
+ * geometry nor the type: the connect button sits half inside the orb with its center
+ * on the rim, the pin squares ride the top edge the same way, and the flags want the
+ * bundled Twemoji font — none of which an ImageView-with-text arrives at. Drawing it
+ * all ourselves also keeps the interactive zones honest: the provider frames its
+ * invisible zone views to the very pixel boxes these paints draw.
  *
- * The proportions, spelled once so the painter and the touch zones agree: the orb fills
- * the box's short side exactly; the connect button's diameter is the distance that puts
- * its center on the orb's rim while its bounding box stays flush with the hitbox's
- * bottom-right corner (W = H: d = W·(1 − 1/√2), the classic corner-badge fit); the pin
- * tiles ride the top-left corner at a small margin, up to [PinRow.MAX_SIDE] wide, in a
- * row that squeezes itself to fit — and since that size depends on how many pins there
- * are, the zone layout keeps a prepared row per count and shows the matching one.
+ * Nothing is measured off the widget's box — that box is never quite square, and
+ * anything that follows it stretches. Everything is measured off the orb alone
+ * ([orbBox]): the circle fills the box's short side, the connect button's diameter
+ * is [BUTTON_SHARE] of that side with its center riding the rim toward the box's
+ * bottom-right corner (the classic corner-badge fit on a square box), and the pin
+ * tiles ride the orb's top-left corner at a small margin, in a row that squeezes
+ * itself to fit — squares stay squares at any stretch.
  */
 object WidgetRenderer {
 
@@ -158,66 +157,139 @@ object WidgetRenderer {
             canvas.restore()
         }
 
-        // ---- the connect button: box flush with the hitbox's bottom-right corner,
-        //      its center landing on the orb's rim --------------------------------
-        val d = buttonDiameter(w, h, short)
-        val bx = w - d / 2f
-        val by = h - d / 2f
+        // ---- the connect button: size tied to the orb alone, center riding the rim
+        //      toward the hitbox's bottom-right corner ------------------------------
+        val button = buttonBox(w, h)
+        val d = button.width()
         // Connected wears the accent; idle is the quiet inverted tone — the same pair
         // the app's own button keeps, just the other way around.
         val buttonFill = if (up) colors.primary else colors.onPrimary
         val buttonGlyph = if (up) colors.onPrimary else colors.primary
-        canvas.drawCircle(bx, by, d / 2f, fillPaint(buttonFill))
-        drawVector(context, R.drawable.ic_power, buttonGlyph, canvas, bx, by, d * 0.46f)
+        canvas.drawCircle(button.centerX(), button.centerY(), d / 2f, fillPaint(buttonFill))
+        drawVector(
+            context, R.drawable.ic_power, buttonGlyph, canvas,
+            button.centerX(), button.centerY(), d * 0.46f,
+        )
 
         // ---- the pinned squares --------------------------------------------------
         val count = pins.size.coerceAtMost(PIN_SLOTS)
-        if (count > 0) {
-            val sideW = w * PinRow.side(count)
-            val sideH = h * PinRow.side(count)
-            val side = minOf(sideW, sideH)
-            val marginLeft = w * PinRow.MARGIN
-            val marginTop = h * PinRow.MARGIN
-            val gapW = w * PinRow.GAP
+        pins.take(count).forEachIndexed { index, pin ->
+            val tile = pinRect(w, h, count, index) ?: return@forEachIndexed
+            val side = tile.width()
             val corner = side * 0.18f
-            pins.take(count).forEachIndexed { index, pin ->
-                val left = marginLeft + index * (sideW + gapW)
-                val tileBox = RectF(left, marginTop, left + sideW, marginTop + sideH)
-                // No rims anywhere on this widget: the picked pin tells itself apart
-                // by its fill alone, the way the connect button's color tells the tunnel.
-                val tileFill = if (pin.active) colors.primary else colors.surfaceContainerHighest
-                canvas.drawRoundRect(tileBox, corner, corner, fillPaint(tileFill))
-                val glyphBox = side * 0.70f
-                val glyph = flagLayout(context, pin.flag, flagStyle, glyphBox * 0.85f)
-                if (glyph != null) {
-                    canvas.save()
-                    canvas.translate(
-                        left + (sideW - glyph.width) / 2f,
-                        marginTop + (sideH - glyph.height) / 2f,
-                    )
-                    glyph.draw(canvas)
-                    canvas.restore()
-                } else {
-                    drawVector(
-                        context,
-                        R.drawable.ic_public,
-                        if (pin.active) colors.onPrimary else colors.onSurfaceVariant,
-                        canvas,
-                        left + sideW / 2f,
-                        marginTop + sideH / 2f,
-                        glyphBox,
-                    )
-                }
+            // No rims anywhere on this widget: the picked pin tells itself apart
+            // by its fill alone, the way the connect button's color tells the tunnel.
+            val tileFill = if (pin.active) colors.primary else colors.surfaceContainerHighest
+            canvas.drawRoundRect(
+                RectF(tile.left, tile.top, tile.right, tile.bottom),
+                corner,
+                corner,
+                fillPaint(tileFill),
+            )
+            val glyphBox = side * 0.70f
+            val glyph = flagLayout(context, pin.flag, flagStyle, glyphBox * 0.85f)
+            if (glyph != null) {
+                canvas.save()
+                canvas.translate(
+                    tile.left + (tile.width() - glyph.width) / 2f,
+                    tile.top + (tile.height() - glyph.height) / 2f,
+                )
+                glyph.draw(canvas)
+                canvas.restore()
+            } else {
+                drawVector(
+                    context,
+                    R.drawable.ic_public,
+                    if (pin.active) colors.onPrimary else colors.onSurfaceVariant,
+                    canvas,
+                    tile.centerX(),
+                    tile.centerY(),
+                    glyphBox,
+                )
             }
         }
     }
 
     /**
-     * The pinned row's own measure, in shares of the widget's width (horizontally)
-     * and height (vertically) — the very numbers the zone layout's weights carry,
-     * spelled here so the painter and the touch zones cannot drift apart. The tiles
-     * sit a small margin off the top-left corner and grow up to [MAX_SIDE] of the
-     * width; a crowded row squeezes them just enough to fit.
+     * A plain frame in float coordinates — spelled here rather than borrowed from
+     * android.graphics.RectF, which the JVM tests meet only as a stub returning
+     * zeroes. The painter and the provider both read their geometry through it.
+     */
+    internal data class FrameF(
+        val left: Float,
+        val top: Float,
+        val right: Float,
+        val bottom: Float,
+    ) {
+        fun width() = right - left
+
+        fun height() = bottom - top
+
+        fun centerX() = (left + right) / 2f
+
+        fun centerY() = (top + bottom) / 2f
+    }
+
+    /**
+     * The whole widget's geometry, measured off the orb alone — never off the box the
+     * launcher hands over, which is never quite square. Everything squares against
+     * [orbBox]: the orb's own bounding square, centered in the box with the box's
+     * short side. The painter draws by these and the provider frames the touch zones
+     * by the same numbers, so squares stay squares and circles stay circles at any
+     * stretch the widget is resized to.
+     */
+    internal fun orbBox(w: Float, h: Float): FrameF {
+        val side = max(1f, minOf(w, h))
+        val left = (w - side) / 2f
+        val top = (h - side) / 2f
+        return FrameF(left, top, left + side, top + side)
+    }
+
+    /** The button's size against the orb's side — the square widget's corner-badge fit. */
+    internal val BUTTON_SHARE = 1f - 1f / sqrt(2f)
+
+    /**
+     * The connect button: its diameter is a share of the orb and nothing else — resize
+     * the widget and the button scales with the circle, never with the box — and its
+     * center rides the rim along the direction of the hitbox's bottom-right corner.
+     * On a square box that answers the classic corner-badge fit exactly: center on
+     * the rim, box flush with the corner.
+     */
+    internal fun buttonBox(w: Float, h: Float): FrameF {
+        val orb = orbBox(w, h)
+        val side = orb.width()
+        val d = BUTTON_SHARE * side
+        // The unit vector from the orb's middle toward the box's bottom-right corner.
+        val vx = w / 2f
+        val vy = h / 2f
+        val len = max(1f, sqrt(vx * vx + vy * vy))
+        val cx = w / 2f + (side / 2f) * (vx / len)
+        val cy = h / 2f + (side / 2f) * (vy / len)
+        return FrameF(cx - d / 2f, cy - d / 2f, cx + d / 2f, cy + d / 2f)
+    }
+
+    /**
+     * One pinned slot's square: the row rides the orb box's top-left corner at a small
+     * margin, one tile after another with a gap between; a crowded row squeezes. All
+     * of it in shares of the orb's side, so the tiles are square whatever the box.
+     * Null when the row holds no such slot.
+     */
+    internal fun pinRect(w: Float, h: Float, count: Int, index: Int): FrameF? {
+        if (count !in 1..PIN_SLOTS || index !in 0 until count) return null
+        val orb = orbBox(w, h)
+        val side = orb.width()
+        val tile = PinRow.side(count) * side
+        val margin = PinRow.MARGIN * side
+        val gap = PinRow.GAP * side
+        val left = orb.left + margin + index * (tile + gap)
+        val top = orb.top + margin
+        return FrameF(left, top, left + tile, top + tile)
+    }
+
+    /**
+     * The pinned row's own measure, in shares of the orb's side — spelled once so the
+     * painter and the touch zones agree on it. The tiles sit a small margin off the
+     * corner and grow up to [MAX_SIDE]; a crowded row squeezes them just enough to fit.
      */
     internal object PinRow {
         /** The breathing room between the corner, and between pin and pin. */
@@ -231,19 +303,6 @@ object WidgetRenderer {
             val n = count.coerceIn(1, PIN_SLOTS)
             return minOf(MAX_SIDE, (1f - 2f * MARGIN - (n - 1) * GAP) / n)
         }
-    }
-
-    /**
-     * The corner-badge fit: d is chosen so the button's center sits exactly on the orb's
-     * rim while its bounding box stays flush with the hitbox's bottom-right corner —
-     * √(((W−d)/2)² + ((H−d)/2)²) = min(W,H)/2. The square widget answers with the clean
-     * d = W·(1 − 1/√2) ≈ 0.29·W; the quadratic covers the stretched cases.
-     */
-    internal fun buttonDiameter(w: Float, h: Float, short: Float): Float {
-        val sum = w + h
-        val discriminant = sum * sum - 2f * (w * w + h * h - short * short)
-        if (discriminant <= 0f) return short * 0.29f
-        return (sum - sqrt(discriminant)) / 2f
     }
 
     // --------------------------------------------------------------- flag glyph

@@ -2,7 +2,6 @@ package slop.miho.chumpy
 
 import android.Manifest
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import slop.miho.chumpy.ui.components.ControllerActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -12,15 +11,29 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,34 +43,24 @@ import slop.miho.chumpy.ui.main.MainShell
 import slop.miho.chumpy.ui.theme.ChumpyTheme
 import slop.miho.chumpy.ui.theme.LocalDarkTheme
 import slop.miho.chumpy.ui.welcome.WelcomeScreen
+import kotlin.math.hypot
 
 class MainActivity : ControllerActivity() {
     companion object {
         /** The update notification's tap: hand the downloaded APK to the installer. */
         const val EXTRA_INSTALL_UPDATE = "install_update"
 
-        /** The orb widget's tap: the window grows out of the widget's circle. */
+        /** The orb widget's tap: the app reveals itself through the circle — [OrbMorph]. */
         const val EXTRA_FROM_ORB = "orb_widget"
     }
+
+    /** True while the orb widget's opening morph is still running; re-fired per tap. */
+    private val orbOpening = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // Opened from the launcher widget: the window unfolds out of a small circle in
-        // the middle of the screen, the orb handing itself over to the app. Only the
-        // widget's tap plays it — every other entrance keeps the system's own.
-        if (intent?.getBooleanExtra(EXTRA_FROM_ORB, false) == true) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                overrideActivityTransition(
-                    OVERRIDE_TRANSITION_OPEN,
-                    R.anim.orb_morph_in,
-                    0,
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                overridePendingTransition(R.anim.orb_morph_in, 0)
-            }
-        }
+        orbOpening.value = intent?.getBooleanExtra(EXTRA_FROM_ORB, false) == true
         setContent {
             val viewModel: MainViewModel = viewModel()
             val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -81,39 +84,44 @@ class MainActivity : ControllerActivity() {
                     // setupDone stays null while the database answers for the first time:
                     // the app holds on the theme until it knows which screen to show.
                     val setupDone by viewModel.setupDone.collectAsStateWithLifecycle()
-                    AnimatedContent(
-                        targetState = setupDone,
-                        transitionSpec = {
-                            if (initialState == null) {
-                                // The app coming open: the hold's empty slot is zero-sized, and
-                                // growing it out with the clip would unfold the window out of
-                                // a corner. The system's own window fade has the launch
-                                // covered — the shell lands whole, at once.
-                                ContentTransform(
-                                    targetContentEnter = fadeIn(snap()),
-                                    initialContentExit = fadeOut(snap()),
-                                    sizeTransform = SizeTransform(sizeAnimationSpec = { _, _ -> snap() }),
+                    // The orb widget's opening morph, when the tap came from it: the
+                    // shell reveals itself through a circle growing out of the middle.
+                    val opening by orbOpening
+                    OrbMorph(active = opening, onDone = { orbOpening.value = false }) {
+                        AnimatedContent(
+                            targetState = setupDone,
+                            transitionSpec = {
+                                if (initialState == null) {
+                                    // The app coming open: the hold's empty slot is zero-sized, and
+                                    // growing it out with the clip would unfold the window out of
+                                    // a corner. The system's own window fade has the launch
+                                    // covered — the shell lands whole, at once.
+                                    ContentTransform(
+                                        targetContentEnter = fadeIn(snap()),
+                                        initialContentExit = fadeOut(snap()),
+                                        sizeTransform = SizeTransform(sizeAnimationSpec = { _, _ -> snap() }),
+                                    )
+                                } else {
+                                    // Onboarding answered and the shell takes over: the slow
+                                    // fade with the settle-down from a touch shy of full.
+                                    (fadeIn(motion.slowEffectsSpec()) +
+                                        scaleIn(motion.slowSpatialSpec(), initialScale = 0.92f))
+                                        .togetherWith(fadeOut(motion.fastEffectsSpec()))
+                                }
+                            },
+                            label = "onboarding",
+                        ) { onboarded ->
+                            if (onboarded == true) {
+                                MainShell(viewModel)
+                            } else if (onboarded == false) {
+                                // No wallpaper here — the bars answer to the theme alone. The
+                                // main shell takes over the window the moment it composes.
+                                SystemBarsIconsDark(dark = LocalDarkTheme.current)
+                                WelcomeScreen(
+                                    onAddSubscription = viewModel::addSubscription,
+                                    onImport = viewModel::addManualProfiles,
                                 )
-                            } else {
-                                // Onboarding answered and the shell takes over: the slow
-                                // fade with the settle-down from a touch shy of full.
-                                (fadeIn(motion.slowEffectsSpec()) +
-                                    scaleIn(motion.slowSpatialSpec(), initialScale = 0.92f))
-                                    .togetherWith(fadeOut(motion.fastEffectsSpec()))
                             }
-                        },
-                        label = "onboarding",
-                    ) { onboarded ->
-                        if (onboarded == true) {
-                            MainShell(viewModel)
-                        } else if (onboarded == false) {
-                            // No wallpaper here — the bars answer to the theme alone. The
-                            // main shell takes over the window the moment it composes.
-                            SystemBarsIconsDark(dark = LocalDarkTheme.current)
-                            WelcomeScreen(
-                                onAddSubscription = viewModel::addSubscription,
-                                onImport = viewModel::addManualProfiles,
-                            )
                         }
                     }
                 }
@@ -126,6 +134,9 @@ class MainActivity : ControllerActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // A warm open from the widget fires the morph again — the hand-off belongs to
+        // the tap, not to the activity's birth.
+        orbOpening.value = intent.getBooleanExtra(EXTRA_FROM_ORB, false)
         handleInstallRequest(intent)
     }
 
@@ -147,5 +158,55 @@ class MainActivity : ControllerActivity() {
         // The activity leaving the screen is the app going background: the loops take
         // their slow stride and the history keeps trickling in behind the scenes.
         ViewModelProvider(this)[MainViewModel::class.java].setAppInForeground(false)
+    }
+}
+
+/**
+ * The orb widget's opening morph: the app reveals itself through a circle growing out
+ * of the middle of the screen — the widget's own shape handing the window over.
+ * While it runs, the circle's rim glides outward and everything still outside it is
+ * the theme's plain background; the shell shows through only where the circle has
+ * already passed. A window-level scale-up would square the whole screen in; the
+ * clip keeps it round, whatever the launch path was.
+ */
+@Composable
+private fun OrbMorph(
+    active: Boolean,
+    onDone: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    if (!active) {
+        content()
+        return
+    }
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        // The widget's circle settles whole, at its own stride.
+        progress.animateTo(1f, tween(550, easing = CubicBezierEasing(0.22f, 0.8f, 0.2f, 1f)))
+        onDone()
+    }
+    val surround = MaterialTheme.colorScheme.surface
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawWithContent {
+                // The radius that finally covers the screen's far corners, from its
+                // middle: half the diagonal, a hair past it so the clip ends clean.
+                val cover = 1.02f * hypot(size.width, size.height) / 2f
+                val radius = progress.value * cover
+                val middleX = size.width / 2f
+                val middleY = size.height / 2f
+                val circle = Path().apply {
+                    addOval(
+                        Rect(middleX - radius, middleY - radius, middleX + radius, middleY + radius),
+                    )
+                }
+                // The shell shows through only where the circle has already passed;
+                // everything still outside it is the theme's plain background.
+                clipPath(circle) { this@drawWithContent.drawContent() }
+                clipPath(circle, clipOp = ClipOp.Difference) { drawRect(surround) }
+            },
+    ) {
+        content()
     }
 }
