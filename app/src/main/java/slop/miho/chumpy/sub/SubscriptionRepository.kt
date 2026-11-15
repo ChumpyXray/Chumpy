@@ -193,13 +193,7 @@ class SubscriptionRepository(
      */
     suspend fun addManualProfiles(text: String): Result<Int> = withContext(Dispatchers.IO) {
         runCatching {
-            val drafts = when {
-                text.trim().startsWith("[Interface]", ignoreCase = true) ->
-                    listOfNotNull(LinkParsers.parseWireguardConf(text))
-                else -> {
-                    SubscriptionParser.parse(text)
-                }
-            }
+            val drafts = SubscriptionParser.parse(text)
             require(drafts.isNotEmpty()) { "No recognizable server link found" }
             db.withTransaction {
                 val old = profiles.bySubscriptionOnce(null)
