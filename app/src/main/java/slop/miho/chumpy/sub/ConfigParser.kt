@@ -27,7 +27,13 @@ import slop.miho.chumpy.db.computeLinkKey
  * so the app round-trips its own exports too. Null means "not this dialect".
  */
 object ConfigParser {
-    private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private val lenientJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        allowComments = true
+        allowTrailingComma = true
+    }
 
     private const val TLS = "tls"
     private const val REALITY = "reality"
@@ -55,11 +61,15 @@ object ConfigParser {
     /** The profiles found in a raw-config body, deduplicated; null when it is not one. */
     fun parse(body: String): List<ProfileEntity>? {
         val trimmed = body.trim().removePrefix("\uFEFF").trim()
-        if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null
+        if (!trimmed.startsWith("[") && !trimmed.startsWith("{") &&
+            !trimmed.startsWith("//") && !trimmed.startsWith("/*")) return null
         val root = try {
             lenientJson.parseToJsonElement(trimmed)
         } catch (_: Exception) {
             return null
+        }
+        if (root is JsonArray && root.none { it is JsonObject }) {
+            return root.strings().mapNotNull(LinkParsers::parse)
         }
         val configs = when (root) {
             is JsonArray -> root.filterIsInstance<JsonObject>().ifEmpty { return null }
