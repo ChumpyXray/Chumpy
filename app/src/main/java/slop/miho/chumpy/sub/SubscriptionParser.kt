@@ -25,11 +25,11 @@ object SubscriptionParser {
         // Clash YAML next — panels serve it to Clash-flavoured clients and to anyone
         // whose UA happens to carry a keyword they recognise.
         ClashYamlParser.parse(text)?.let { return it.distinctBy { it.computeLinkKey() } }
-        val profiles = text.lines().mapNotNull { line ->
-            LinkParsers.parse(line)
+        val profiles = text.lineSequence().mapNotNull { line ->
+            LinkParsers.parseHttpProxy(line) ?: LinkParsers.parse(line)
         }
         // Identical servers repeated in one body collapse to the first occurrence.
-        return profiles.distinctBy { it.computeLinkKey() }
+        return profiles.distinctBy { it.computeLinkKey() }.toList()
     }
 
     /**

@@ -838,9 +838,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun addSubscription(url: String, name: String? = null, onDone: (String?) -> Unit = {}) {
         val trimmed = url.trim()
-        if (!trimmed.startsWith("http://", ignoreCase = true) &&
-            !trimmed.startsWith("https://", ignoreCase = true)
-        ) {
+        val isSubscriptionUrl = '\n' !in trimmed && '\r' !in trimmed &&
+            (trimmed.startsWith("http://", ignoreCase = true) ||
+                trimmed.startsWith("https://", ignoreCase = true))
+        if (!isSubscriptionUrl) {
             addManualProfiles(trimmed, onDone)
             return
         }

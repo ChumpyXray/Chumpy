@@ -63,6 +63,29 @@ object LinkParsers {
             ?.copy(sourceLink = raw)
     }
 
+    internal fun parseHttpProxy(line: String): ProfileEntity? {
+        val raw = line.trim()
+        val https = raw.startsWith("https://", ignoreCase = true)
+        if (!https && !raw.startsWith("http://", ignoreCase = true)) return null
+        val uri = parseUri(raw) ?: return null
+        if (uri.idnHost.isEmpty() || uri.port !in 1..65535 ||
+            uri.rawPath.orEmpty() !in setOf("", "/") || uri.rawQuery != null
+        ) return null
+        val credentials = uri.rawUserInfo.orEmpty()
+        val username = decodeURIComponent(credentials.substringBefore(':'))
+        val password = decodeURIComponent(credentials.substringAfter(':', ""))
+        if (username.isEmpty() && password.isNotEmpty()) return null
+        return draft(ProfileType.HTTP).copy(
+            remarks = fragmentOf(uri),
+            server = uri.idnHost,
+            serverPort = uri.port,
+            username = username,
+            password = password,
+            security = if (https) TLS else "",
+            sourceLink = raw,
+        )
+    }
+
     /** A WireGuard .conf file body (the tunnel-migration import path). */
     fun parseWireguardConf(text: String): ProfileEntity? {
         val interfaceParams = mutableMapOf<String, String>()
