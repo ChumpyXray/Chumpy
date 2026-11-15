@@ -45,8 +45,8 @@ class OrbGeometryTest {
         assertEquals(0.23f, side(1), 0.0001f)
         assertEquals(0.23f, side(2), 0.0001f)
         assertEquals(0.23f, side(3), 0.0001f)
-        assertEquals(0.2225f, side(4), 0.0001f)
-        assertEquals(0.174f, side(5), 0.0001f)
+        assertEquals(0.215f, side(4), 0.0001f)
+        assertEquals(0.168f, side(5), 0.0001f)
         // Whatever the count, the row fits: margin, tiles, gaps, and the far margin
         // never run past the widget's edge.
         for (n in 1..5) {

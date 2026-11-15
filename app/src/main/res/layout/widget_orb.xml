@@ -71,7 +71,7 @@
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="2.5" />
+            android:layout_weight="4" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -82,7 +82,7 @@
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="2.5" />
+                android:layout_weight="4" />
 
             <ImageView
                 android:id="@+id/wgt_pin_1_0"
@@ -93,13 +93,13 @@
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="74.5" />
+                android:layout_weight="73" />
         </LinearLayout>
 
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="74.5" />
+            android:layout_weight="73" />
     </LinearLayout>
 
     <!-- Two pins. -->
@@ -113,7 +113,7 @@
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="2.5" />
+            android:layout_weight="4" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -124,7 +124,7 @@
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="2.5" />
+                android:layout_weight="4" />
 
             <ImageView
                 android:id="@+id/wgt_pin_2_0"
@@ -146,13 +146,13 @@
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="49.5" />
+                android:layout_weight="48" />
         </LinearLayout>
 
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="74.5" />
+            android:layout_weight="73" />
     </LinearLayout>
 
     <!-- Three pins. -->
@@ -166,7 +166,7 @@
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="2.5" />
+            android:layout_weight="4" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -177,7 +177,7 @@
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="2.5" />
+                android:layout_weight="4" />
 
             <ImageView
                 android:id="@+id/wgt_pin_3_0"
@@ -210,13 +210,13 @@
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="24.5" />
+                android:layout_weight="23" />
         </LinearLayout>
 
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="74.5" />
+            android:layout_weight="73" />
     </LinearLayout>
 
     <!-- Four pins — the row starts to squeeze. -->
@@ -230,24 +230,24 @@
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="2.5" />
+            android:layout_weight="4" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="22.25"
+            android:layout_weight="21.5"
             android:orientation="horizontal">
 
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="2.5" />
+                android:layout_weight="4" />
 
             <ImageView
                 android:id="@+id/wgt_pin_4_0"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="22.25" />
+                android:layout_weight="21.5" />
 
             <ImageView
                 android:layout_width="0dp"
@@ -258,7 +258,7 @@
                 android:id="@+id/wgt_pin_4_1"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="22.25" />
+                android:layout_weight="21.5" />
 
             <ImageView
                 android:layout_width="0dp"
@@ -269,7 +269,7 @@
                 android:id="@+id/wgt_pin_4_2"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="22.25" />
+                android:layout_weight="21.5" />
 
             <ImageView
                 android:layout_width="0dp"
@@ -280,18 +280,18 @@
                 android:id="@+id/wgt_pin_4_3"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="22.25" />
+                android:layout_weight="21.5" />
 
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="2.5" />
+                android:layout_weight="4" />
         </LinearLayout>
 
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="75.25" />
+            android:layout_weight="74.5" />
     </LinearLayout>
 
     <!-- Five pins — the row at its tightest. -->
@@ -305,24 +305,24 @@
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="2.5" />
+            android:layout_weight="4" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="17.4"
+            android:layout_weight="16.8"
             android:orientation="horizontal">
 
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="2.5" />
+                android:layout_weight="4" />
 
             <ImageView
                 android:id="@+id/wgt_pin_5_0"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="17.4" />
+                android:layout_weight="16.8" />
 
             <ImageView
                 android:layout_width="0dp"
@@ -333,7 +333,7 @@
                 android:id="@+id/wgt_pin_5_1"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="17.4" />
+                android:layout_weight="16.8" />
 
             <ImageView
                 android:layout_width="0dp"
@@ -344,7 +344,7 @@
                 android:id="@+id/wgt_pin_5_2"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="17.4" />
+                android:layout_weight="16.8" />
 
             <ImageView
                 android:layout_width="0dp"
@@ -355,7 +355,7 @@
                 android:id="@+id/wgt_pin_5_3"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="17.4" />
+                android:layout_weight="16.8" />
 
             <ImageView
                 android:layout_width="0dp"
@@ -366,17 +366,17 @@
                 android:id="@+id/wgt_pin_5_4"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="17.4" />
+                android:layout_weight="16.8" />
 
             <ImageView
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="2.5" />
+                android:layout_weight="4" />
         </LinearLayout>
 
         <ImageView
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="80.1" />
+            android:layout_weight="79.2" />
     </LinearLayout>
 </FrameLayout>

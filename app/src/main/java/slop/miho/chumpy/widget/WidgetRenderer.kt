@@ -103,37 +103,14 @@ object WidgetRenderer {
         val cx = w / 2f
         val cy = h / 2f
         val up = state == TunnelState.UP
-        val busy = state == TunnelState.CONNECTING || state == TunnelState.DISCONNECTING
-        // The orb stays one calm tonal color whatever the tunnel does — the state is the
-        // connect button's to carry, the ring only borrowing the rim while busy.
-        val fill = colors.secondaryContainer
-        val content = colors.onSecondaryContainer
+        // The orb is the widget's background made round: one color, whatever the tunnel
+        // does — the connect button alone carries the state. No ring, no loading show.
+        val fill = colors.background
+        val content = colors.onBackground
         val flagStyle = SettingsStore.settings(context).value.flagStyle
 
         // ---- the orb ------------------------------------------------------------
         canvas.drawCircle(cx, cy, radius, fillPaint(fill))
-        if (busy) {
-            // The traveling wave cannot travel in a still bitmap; a ring with a gap is
-            // what it settles into — the busy state's own mark, and the only stroke
-            // the orb ever wears.
-            val arcWidth = max(2f, short * 0.014f)
-            val arc = fillPaint(colors.primary)
-            arc.style = Paint.Style.STROKE
-            arc.strokeWidth = arcWidth
-            val box = RectF(
-                cx - radius + arcWidth,
-                cy - radius + arcWidth,
-                cx + radius - arcWidth,
-                cy + radius - arcWidth,
-            )
-            canvas.drawArc(
-                box,
-                if (state == TunnelState.CONNECTING) 250f else 130f,
-                300f,
-                false,
-                arc,
-            )
-        }
 
         // ---- the middle: flag, region, subscription -----------------------------
         val flagBox = short * 0.30f
@@ -156,7 +133,9 @@ object WidgetRenderer {
         val gap = short * 0.025f
         val total = (flagLayout?.height ?: flagBox.toInt()) + gap + regionLayout.height +
             (subLayout?.let { gap * 0.7f + it.height } ?: 0f)
-        var top = cy - total / 2f
+        // A touch below the mathematical middle: the pin row crowds the top edge, so
+        // the stack — the flag first of all — settles a little lower and breathes.
+        var top = cy - total / 2f + short * 0.015f
         if (flagLayout != null) {
             canvas.save()
             canvas.translate(cx - flagLayout.width / 2f, top)
@@ -240,7 +219,7 @@ object WidgetRenderer {
      */
     internal object PinRow {
         /** The breathing room between the corner, and between pin and pin. */
-        const val MARGIN = 0.025f
+        const val MARGIN = 0.04f
         const val GAP = 0.02f
 
         /** The pin size the row grows to before crowding starts. */
