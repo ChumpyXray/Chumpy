@@ -327,4 +327,5 @@
     <string name="local_network_permission_required">Разрешите доступ к устройствам поблизости, чтобы принимать файлы с телефона.</string>
     <string name="subscription_support">Поддержка</string>
     <string name="subscription_website">Сайт подписки</string>
+    <string name="server_ping_action">Проверить пинг сервера</string>
 </resources>

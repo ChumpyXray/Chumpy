@@ -331,4 +331,5 @@
     <string name="local_network_permission_required">Allow access to nearby devices to receive files from your phone.</string>
     <string name="subscription_support">Support</string>
     <string name="subscription_website">Subscription website</string>
+    <string name="server_ping_action">Check server latency</string>
 </resources>

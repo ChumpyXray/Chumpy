@@ -1065,20 +1065,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Measures the selected server's delay right now — the servers screen's selected row
-     * and Home's chip share the result. Returns null when there is nothing to measure.
-     */
-    fun pingSelected() {
-        val profile = selectedProfile.value ?: return
-        // A balancer is measured by living: the live loop reports the tunnel's own delay.
-        if (profile.type == ProfileType.BALANCER) return
-        viewModelScope.launch(Dispatchers.IO) {
-            val delay = tunnelClient.measureDelay(
-                XrayConfigBuilder.buildTest(profile),
-                connection.value.delayTestUrl,
-            )
-            repository.setProfileDelay(profile.id, delay, System.currentTimeMillis())
+    private val individualPings = mutableSetOf<String>()
+
+    fun pingServer(id: String) {
+        val profile = _servers.value.profiles.firstOrNull { it.id == id } ?: return
+        if (profile.type == ProfileType.BALANCER || !individualPings.add(id)) return
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    pingSemaphore.withPermit {
+                        val delay = tunnelClient.measureDelay(
+                            XrayConfigBuilder.buildTest(profile),
+                            connection.value.delayTestUrl,
+                        )
+                        repository.setProfileDelay(id, delay, System.currentTimeMillis())
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                Log.w("Chumpy/Ping", "Individual delay measurement failed")
+                repository.setProfileDelay(id, null, System.currentTimeMillis())
+            } finally {
+                individualPings.remove(id)
+            }
         }
     }
 

@@ -1,6 +1,16 @@
 package slop.miho.chumpy.ui.main
 
 import androidx.core.graphics.createBitmap
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import android.content.Intent
 import androidx.core.net.toUri
 import androidx.compose.material3.FilledTonalIconButton
@@ -46,6 +56,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
@@ -194,6 +205,7 @@ fun ServersScreen(
     tunnelUp: Boolean = false,
     onUpdate: () -> Unit,
     onPing: () -> Unit,
+    onPingServer: (String) -> Unit,
     onSelectSubscription: (String) -> Unit,
     onAddSubscription: (url: String, name: String?, onDone: (String?) -> Unit) -> Unit,
     onDeleteSubscription: (String) -> Unit,
@@ -512,6 +524,7 @@ fun ServersScreen(
                         flagStyle = flagStyle,
                         tunnelUp = tunnelUp,
                         onSelect = onSelect,
+                        onPingServer = onPingServer,
                         onDelete = { onDeleteManualProfile(it.id) },
                         onTogglePinned = onTogglePinned,
                         onToggleConcealed = onToggleConcealed,
@@ -2181,6 +2194,7 @@ private fun ServerGroupRow(
     flagStyle: FlagStyle,
     tunnelUp: Boolean,
     onSelect: (String) -> Unit,
+    onPingServer: (String) -> Unit,
     onDelete: (ProfileEntity) -> Unit,
     onTogglePinned: (String, Boolean) -> Unit,
     onToggleConcealed: (String, Boolean) -> Unit,
@@ -2222,6 +2236,7 @@ private fun ServerGroupRow(
         // The long press's own door — always open, unlike the menu it opens: the
         // plumbing above is born on first use, so the press can't ride on it.
         onMenuOpen = { onMenuHostChange(profile.id) },
+        onPing = { onPingServer(profile.id) },
         // Every config row carries the menu, but not every one the same
         // menu: the loose configs own themselves — the pin, the hide and
         // the delete are theirs, the copy of the link they were born from
@@ -2299,6 +2314,7 @@ private fun ServerRow(
     // The long press's own door — always open, unlike the menu it opens: the menu's
     // plumbing is born on first use (see ServerGroupRow), so the press can't ride on it.
     onMenuOpen: () -> Unit,
+    onPing: () -> Unit,
     menu: RowMenu?,
     dimmed: Boolean,
     shape: Shape,
@@ -2384,6 +2400,45 @@ private fun ServerRow(
         measured = true
     }
 
+    val canPing = profile.type != ProfileType.BALANCER && !profile.concealed
+    val swipeEnabled = canPing && !dimmed && menu?.open != true &&
+        LocalInputMode.current != InputMode.CONTROLLER
+    val pingLabel = stringResource(R.string.server_ping_action)
+    val latestPing by rememberUpdatedState(onPing)
+    val swipeOffset = remember(profile.id) { mutableFloatStateOf(0f) }
+    val swipeScope = rememberCoroutineScope()
+    val swipe = if (swipeEnabled) Modifier.pointerInput(profile.id) {
+        val reveal = 72.dp.toPx()
+        var settle: kotlinx.coroutines.Job? = null
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val start = awaitHorizontalTouchSlopOrCancellation(down.id) { change, delta ->
+                if (delta > 0f) {
+                    settle?.cancel()
+                    swipeOffset.floatValue = delta.coerceAtMost(reveal)
+                    change.consume()
+                }
+            } ?: return@awaitEachGesture
+            try {
+                val completed = horizontalDrag(start.id) { change ->
+                    swipeOffset.floatValue = (swipeOffset.floatValue +
+                        change.position.x - change.previousPosition.x).coerceIn(0f, reveal)
+                    change.consume()
+                }
+                if (completed && swipeOffset.floatValue >= reveal * 0.75f) latestPing()
+            } finally {
+                settle = swipeScope.launch {
+                    animate(swipeOffset.floatValue, 0f) { value, _ ->
+                        swipeOffset.floatValue = value
+                    }
+                }
+            }
+        }
+    } else Modifier
+    LaunchedEffect(swipeEnabled) {
+        if (!swipeEnabled) swipeOffset.floatValue = 0f
+    }
+
     // The row's own frame, clipping to nothing: every Surface clips to its shape,
     // and the pin rides the top-right corner half over the edge — so the pin stands
     // outside the card, pinned through it from the frame. The frame wears no dim of
@@ -2392,15 +2447,31 @@ private fun ServerRow(
     // the pin each in their own layer instead, so the one follows the other into
     // the half-light without losing the pin's overhang.
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(swipe)
+            .graphicsLayer { clip = swipeOffset.floatValue > 0f },
     ) {
+        if (swipeOffset.floatValue > 0f) {
+            Box(Modifier.matchParentSize().clip(shape)) {
+                Box(
+                    modifier = Modifier.width(72.dp).fillMaxHeight()
+                        .graphicsLayer { translationX = swipeOffset.floatValue - size.width }
+                        .background(colors.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(painterResource(R.drawable.ic_speed_normal), null, tint = colors.onPrimaryContainer)
+                }
+            }
+        }
         Surface(
             shape = shape,
             color = containerColor,
             contentColor = contentColor,
             modifier = Modifier
                 .fillMaxWidth()
-                .graphicsLayer { alpha = dim * foldDim() },
+                .graphicsLayer {
+                    alpha = dim * foldDim()
+                    translationX = swipeOffset.floatValue
+                },
         ) {
             // The row's body laid out by hand, to ListItem's own drawing — the M3
             // component carries a colors machine and a defaults table every row paid
@@ -2412,6 +2483,9 @@ private fun ServerRow(
                     .focusRing(inset = true, gap = 1.dp)
                     .restoreControllerFocus(menu?.open == true)
                     .controllerContextMenu { onMenuOpen() }
+                    .then(if (canPing) Modifier.semantics {
+                        customActions = listOf(CustomAccessibilityAction(pingLabel) { onPing(); true })
+                    } else Modifier)
                     .combinedClickable(
                         role = Role.Button,
                         onClick = {
