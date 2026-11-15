@@ -214,23 +214,20 @@ object LinkParsers {
     private fun parseShadowsocksSip002(str: String): ProfileEntity? {
         val uri = parseUri(str) ?: return null
         if (uri.idnHost.isEmpty() || uri.port <= 0) return null
-        val userInfo = uri.userInfo ?: return null
-        if (userInfo.isEmpty()) return null
-
-        val parts = if (userInfo.contains(":")) {
-            userInfo.split(":", limit = 2)
+        val userInfo = uri.rawUserInfo?.takeIf { it.isNotEmpty() } ?: return null
+        val parts = if (':' in userInfo) {
+            userInfo.split(':', limit = 2).map(LinkUtils::decodeURIComponent)
         } else {
-            LinkUtils.decode(userInfo).split(":", limit = 2)
+            LinkUtils.decode(decodeURIComponent(userInfo)).split(':', limit = 2)
         }
         if (parts.size != 2 || parts.first().isBlank()) return null
         var profile = draft(ProfileType.SHADOWSOCKS).copy(
             remarks = fragmentOf(uri),
             server = uri.idnHost,
             serverPort = uri.port,
+            method = parts.first().lowercase(),
+            password = parts.last(),
         )
-        if (parts.size == 2) {
-            profile = profile.copy(method = parts.first(), password = parts.last())
-        }
         // The simple-obfs plugin rides along as a plain HTTP header fake.
         val plugin = queryParams(uri)["plugin"].orEmpty()
         if (plugin.contains("obfs=http")) {
