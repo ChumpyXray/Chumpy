@@ -2406,6 +2406,7 @@ private fun ServerRow(
     val pingLabel = stringResource(R.string.server_ping_action)
     val latestPing by rememberUpdatedState(onPing)
     val swipeOffset = remember(profile.id) { mutableFloatStateOf(0f) }
+    val swipeVisible by remember(swipeOffset) { derivedStateOf { swipeOffset.floatValue > 0f } }
     val swipeScope = rememberCoroutineScope()
     val swipe = if (swipeEnabled) Modifier.pointerInput(profile.id) {
         val reveal = 72.dp.toPx()
@@ -2448,9 +2449,9 @@ private fun ServerRow(
     // the half-light without losing the pin's overhang.
     Box(
         modifier = Modifier.fillMaxWidth().then(swipe)
-            .graphicsLayer { clip = swipeOffset.floatValue > 0f },
+            .then(if (swipeVisible) Modifier.clipToBounds() else Modifier),
     ) {
-        if (swipeOffset.floatValue > 0f) {
+        if (swipeVisible) {
             Box(Modifier.matchParentSize().clip(shape)) {
                 Box(
                     modifier = Modifier.width(72.dp).fillMaxHeight()
