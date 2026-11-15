@@ -15,6 +15,11 @@ import slop.miho.chumpy.db.computeLinkKey
 object ClashYamlParser {
     private val PROXIES_KEY = Regex("""(?m)^[ \t]*(?:proxies|"proxies"|'proxies')[ \t]*:""")
 
+    private val httpFields = setOf(
+        "name", "type", "server", "port", "username", "password", "headers",
+        "tls", "sni", "servername", "skip-cert-verify", "alpn",
+    )
+
     /** The profiles found in the `proxies:` list, deduplicated; null when it is not one. */
     fun parse(body: String): List<ProfileEntity>? {
         if (!PROXIES_KEY.containsMatchIn(body)) return null
@@ -37,6 +42,7 @@ object ClashYamlParser {
             "trojan" -> ProfileType.TROJAN
             "ss", "shadowsocks" -> ProfileType.SHADOWSOCKS
             "socks5", "socks" -> ProfileType.SOCKS
+            "http" -> ProfileType.HTTP
             "hysteria2", "hy2" -> ProfileType.HYSTERIA2
             else -> return null
         }
@@ -70,7 +76,7 @@ object ClashYamlParser {
                 password = (proxy["password"] as? String).orEmpty(),
             )
 
-            ProfileType.SOCKS -> profile = profile.copy(
+            ProfileType.SOCKS, ProfileType.HTTP -> profile = profile.copy(
                 username = (proxy["username"] as? String).orEmpty(),
                 password = (proxy["password"] as? String).orEmpty(),
             )
@@ -93,6 +99,16 @@ object ClashYamlParser {
             else -> Unit
         }
 
+        if (type == ProfileType.HTTP) {
+            val headers = proxy["headers"]
+            if (headers != null && headers != "" && headers != "{}" && headers != emptyMap<Any, Any>()) return null
+            if (proxy.keys.any { it !in httpFields }) return null
+            val tls = (proxy["tls"] as? String)?.lowercase()
+            if (proxy["tls"] != null && tls !in setOf("true", "false")) return null
+            val skipVerification = (proxy["skip-cert-verify"] as? String)?.lowercase()
+            if (proxy["skip-cert-verify"] != null && skipVerification != "false") return null
+            if (profile.username.isEmpty() && profile.password.isNotEmpty()) return null
+        }
         val reality = proxy["reality-opts"] as? Map<*, *>
         var result = profile.copy(
             network = if (type == ProfileType.HYSTERIA2) "hysteria" else when (val net = proxy["network"] as? String) {

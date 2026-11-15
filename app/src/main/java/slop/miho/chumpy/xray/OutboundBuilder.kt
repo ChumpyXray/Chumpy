@@ -42,6 +42,7 @@ object OutboundBuilder {
         ProfileType.TROJAN -> "trojan"
         ProfileType.SHADOWSOCKS -> "shadowsocks"
         ProfileType.SOCKS -> "socks"
+        ProfileType.HTTP -> "http"
         ProfileType.WIREGUARD -> "wireguard"
         ProfileType.HYSTERIA2 -> "hysteria"
         // A balancer never reaches an outbound: it is unwrapped into its members at
@@ -86,7 +87,7 @@ object OutboundBuilder {
                 put("level", 8)
             }
 
-            ProfileType.SOCKS -> {
+            ProfileType.SOCKS, ProfileType.HTTP -> {
                 put("address", host(profile))
                 put("port", profile.serverPort)
                 if (profile.username.isNotEmpty()) put("user", profile.username)
