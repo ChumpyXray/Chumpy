@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LocalContentColor
@@ -53,6 +54,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -241,10 +245,7 @@ fun HomeScreen(
                 // A failed connect takes over the server card's slot, with the same appear
                 // motion; it leaves again as soon as the next attempt clears the error.
                 TunnelAppear(visible = status.error != null) {
-                    ErrorCard(
-                        message = status.error.orEmpty(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    status.error?.let { TunnelErrorCard(it) }
                 }
                 home.profileLabel?.let { title ->
                     // The server card is always there, connected or not: the picked
@@ -395,6 +396,52 @@ private fun InfoChips(
 
 /** The server card fades and slides in with the MD3 motion scheme when the tunnel
  *  comes up, and shrinks away when it goes down. */
+@Composable
+private fun TunnelErrorCard(rawError: String) {
+    var detailsOpen by remember(rawError) { mutableStateOf(false) }
+    val localMessages = listOf(
+        stringResource(R.string.error_no_config),
+        stringResource(R.string.error_vpn_not_authorized),
+        stringResource(R.string.error_tun_creation),
+    )
+    val message = when {
+        rawError in localMessages -> rawError
+        rawError.contains("address already in use", ignoreCase = true) ->
+            stringResource(R.string.tunnel_error_port_busy)
+        rawError.contains("geosite.dat", ignoreCase = true) ||
+            rawError.contains("geoip.dat", ignoreCase = true) ->
+            stringResource(R.string.tunnel_error_geodata)
+        rawError.contains("config error", ignoreCase = true) ||
+            rawError.contains("failed to build config", ignoreCase = true) ->
+            stringResource(R.string.tunnel_error_config)
+        else -> stringResource(R.string.tunnel_error_generic)
+    }
+
+    ErrorCard(
+        message = message,
+        supporting = stringResource(R.string.tunnel_error_details),
+        modifier = Modifier.fillMaxWidth()
+            .clip(MaterialTheme.shapes.extraLarge)
+            .focusRing(shape = MaterialTheme.shapes.extraLarge, inset = true)
+            .clickable { detailsOpen = true },
+    )
+
+    if (detailsOpen) {
+        AlertDialog(
+            onDismissRequest = { detailsOpen = false },
+            title = { Text(stringResource(R.string.tunnel_error_details)) },
+            text = {
+                Text(rawError, modifier = Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()))
+            },
+            confirmButton = {
+                TextButton(onClick = { detailsOpen = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
+}
+
 @Composable
 private fun TunnelAppear(visible: Boolean, content: @Composable () -> Unit) {
     val motion = MaterialTheme.motionScheme

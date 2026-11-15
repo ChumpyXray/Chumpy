@@ -332,4 +332,9 @@
     <string name="subscription_support">Support</string>
     <string name="subscription_website">Subscription website</string>
     <string name="server_ping_action">Check server latency</string>
+    <string name="tunnel_error_port_busy">A local port is busy. Close any other VPN or proxy app and try again.</string>
+    <string name="tunnel_error_geodata">Couldn\'t load the routing databases. Refresh the subscription and try again.</string>
+    <string name="tunnel_error_config">Couldn\'t read this server\'s settings. Refresh the subscription or try another server.</string>
+    <string name="tunnel_error_generic">Couldn\'t start the VPN. Try connecting again.</string>
+    <string name="tunnel_error_details">Technical details</string>
 </resources>

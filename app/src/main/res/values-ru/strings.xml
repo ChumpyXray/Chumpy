@@ -328,4 +328,9 @@
     <string name="subscription_support">Поддержка</string>
     <string name="subscription_website">Сайт подписки</string>
     <string name="server_ping_action">Проверить пинг сервера</string>
+    <string name="tunnel_error_port_busy">Локальный порт занят. Закройте другие VPN или прокси-приложения и попробуйте снова.</string>
+    <string name="tunnel_error_geodata">Не удалось загрузить базы маршрутизации. Обновите подписку и попробуйте снова.</string>
+    <string name="tunnel_error_config">Не удалось прочитать настройки сервера. Обновите подписку или выберите другой сервер.</string>
+    <string name="tunnel_error_generic">Не удалось запустить VPN. Попробуйте подключиться снова.</string>
+    <string name="tunnel_error_details">Технические подробности</string>
 </resources>
