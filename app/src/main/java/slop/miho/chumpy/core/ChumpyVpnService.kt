@@ -482,7 +482,7 @@ class ChumpyVpnService : VpnService() {
                 ensureForeground()
             } catch (e: Exception) {
                 if (generation != commandGeneration.get()) return@execute
-                Log.e(TAG, "Failed to bring the tunnel up", e)
+                XrayCore.recordTunnelFailure("Failed to bring the tunnel up", e)
                 if (announceAutoReconnect) {
                     // The auto-reconnect's own outcome: the notice that promised the climb
                     // back now says how it ended. Reconnect stays its action — the user's
@@ -596,7 +596,7 @@ class ChumpyVpnService : VpnService() {
             XrayCore.startLoop(config, XrayCore.currentTunFd())?.let { throw it }
             Log.i(TAG, "The core re-dialed onto the network now under it")
         } catch (e: Exception) {
-            Log.e(TAG, "The handover re-dial failed", e)
+            XrayCore.recordTunnelFailure("The handover re-dial failed", e)
             stopTunnelWatch()
             XrayCore.stopLoop()
             closeTun()

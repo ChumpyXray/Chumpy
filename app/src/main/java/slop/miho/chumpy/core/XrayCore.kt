@@ -92,6 +92,10 @@ object XrayCore {
     /** The ring's whole tail, oldest first — the viewer's text. */
     fun coreLogs(): String = synchronized(logRing) { logRing.joinToString("\n") }
 
+    fun recordTunnelFailure(stage: String, error: Exception) {
+        log(Log.ERROR, stage, error)
+    }
+
     private fun log(level: Int, message: String, error: Exception? = null) {
         val line = when (level) {
             Log.ERROR -> "E/"
