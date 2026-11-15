@@ -163,8 +163,10 @@ object WidgetRenderer {
         val d = buttonDiameter(w, h, short)
         val bx = w - d / 2f
         val by = h - d / 2f
-        val buttonFill = if (up) colors.onPrimary else colors.primary
-        val buttonGlyph = if (up) colors.primary else colors.onPrimary
+        // Connected wears the accent; idle is the quiet inverted tone — the same pair
+        // the app's own button keeps, just the other way around.
+        val buttonFill = if (up) colors.primary else colors.onPrimary
+        val buttonGlyph = if (up) colors.onPrimary else colors.primary
         canvas.drawCircle(bx, by, d / 2f, fillPaint(buttonFill))
         drawVector(context, R.drawable.ic_power, buttonGlyph, canvas, bx, by, d * 0.46f)
 

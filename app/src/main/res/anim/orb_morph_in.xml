@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The orb widget's opening morph: the app's window unfolds out of a small circle in
+    the middle of the screen — a touch bigger than the widget's own orb — settling at
+    full size with the same decelerating stride the app's springs keep.
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="400"
+    android:interpolator="@android:interpolator/decelerate_quint"
+    android:shareInterpolator="true">
+
+    <scale
+        android:fromXScale="30%"
+        android:toXScale="100%"
+        android:fromYScale="30%"
+        android:toYScale="100%"
+        android:pivotX="50%"
+        android:pivotY="50%" />
+
+    <alpha
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0"
+        android:duration="200"
+        android:interpolator="@android:interpolator/linear" />
+</set>

@@ -17,11 +17,15 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- fitCenter, not fitXY: the host's size is an estimate, and when the real box
+         drifts from it, fitXY would squash the circles into ellipses on resize.
+         fitCenter shrinks the whole picture a uniform step instead — the orb stays
+         round whatever the launcher reports. -->
     <ImageView
         android:id="@+id/wgt_visual"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="fitXY"
+        android:scaleType="fitCenter"
         android:contentDescription="@null" />
 
     <!-- The base layer: open the app from wherever nothing more specific sits. -->

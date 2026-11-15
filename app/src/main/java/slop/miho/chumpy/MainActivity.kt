@@ -2,6 +2,7 @@ package slop.miho.chumpy
 
 import android.Manifest
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import slop.miho.chumpy.ui.components.ControllerActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,11 +35,29 @@ class MainActivity : ControllerActivity() {
     companion object {
         /** The update notification's tap: hand the downloaded APK to the installer. */
         const val EXTRA_INSTALL_UPDATE = "install_update"
+
+        /** The orb widget's tap: the window grows out of the widget's circle. */
+        const val EXTRA_FROM_ORB = "orb_widget"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Opened from the launcher widget: the window unfolds out of a small circle in
+        // the middle of the screen, the orb handing itself over to the app. Only the
+        // widget's tap plays it — every other entrance keeps the system's own.
+        if (intent?.getBooleanExtra(EXTRA_FROM_ORB, false) == true) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                overrideActivityTransition(
+                    OVERRIDE_TRANSITION_OPEN,
+                    R.anim.orb_morph_in,
+                    0,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                overridePendingTransition(R.anim.orb_morph_in, 0)
+            }
+        }
         setContent {
             val viewModel: MainViewModel = viewModel()
             val settings by viewModel.settings.collectAsStateWithLifecycle()

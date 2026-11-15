@@ -48,7 +48,8 @@ import slop.miho.chumpy.xray.XrayConfigBuilder
  * The taps: the button toggles the tunnel (or opens the app when the consent or a
  * config is missing, the QS tile's own hand-off); a pin picks its server and, when the
  * tunnel is up, reloads the running core onto it — the interface's own server switch,
- * the session never dropping; the orb itself opens the app.
+ * the session never dropping; the orb itself opens the app, its circle handing over
+ * — the morph [MainActivity] plays when it sees the orb's extra on the way in.
  */
 class OrbWidget : AppWidgetProvider() {
 
@@ -175,10 +176,15 @@ class OrbWidget : AppWidgetProvider() {
     ): android.widget.RemoteViews {
         val views = android.widget.RemoteViews(context.packageName, R.layout.widget_orb)
         views.setImageViewBitmap(R.id.wgt_visual, bitmap)
+        // The orb's own open: the widget hands its circle over, and the app grows out
+        // of it — MainActivity plays the morph when it sees this extra.
         val open = PendingIntent.getActivity(
             context,
             REQUEST_OPEN,
-            Intent(context, MainActivity::class.java),
+            Intent(context, MainActivity::class.java).putExtra(
+                MainActivity.EXTRA_FROM_ORB,
+                true,
+            ),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         views.setOnClickPendingIntent(R.id.wgt_orb, open)
