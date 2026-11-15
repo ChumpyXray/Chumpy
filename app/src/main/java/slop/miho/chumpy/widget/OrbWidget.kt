@@ -200,29 +200,52 @@ class OrbWidget : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.wgt_button, open)
             views.setContentDescription(R.id.wgt_button, context.getString(R.string.widget_setup))
         }
-        // The pins: a tap picks its server; the empty slots behind them fall through to
-        // the app the way the orb itself does.
-        for (slot in 0 until WidgetRenderer.PIN_SLOTS) {
-            val pin = pins.getOrNull(slot)
-            if (pin != null) {
-                views.setOnClickPendingIntent(
-                    tileId(slot),
-                    broadcast(context, ACTION_PICK, REQUEST_PIN_BASE + slot, pin.id),
-                )
-                views.setContentDescription(tileId(slot), pin.label)
-            } else {
-                views.setOnClickPendingIntent(tileId(slot), open)
-            }
+        // The pins: a tap picks its server. The zone layout keeps a prepared row per
+        // count (the painted row's own size depends on how many pins it holds), so the
+        // matching one is shown and carries the taps; every other count stays hidden,
+        // and the whole rest of the widget falls through to the open-the-app base.
+        val shown = pins.size.coerceIn(0, WidgetRenderer.PIN_SLOTS)
+        for (count in 1..WidgetRenderer.PIN_SLOTS) {
+            views.setViewVisibility(
+                groupId(count),
+                if (count == shown) android.view.View.VISIBLE else android.view.View.GONE,
+            )
+        }
+        for (slot in 0 until shown) {
+            val pin = pins[slot]
+            views.setOnClickPendingIntent(
+                pinId(shown, slot),
+                broadcast(context, ACTION_PICK, REQUEST_PIN_BASE + slot, pin.id),
+            )
+            views.setContentDescription(pinId(shown, slot), pin.label)
         }
         return views
     }
 
-    private fun tileId(slot: Int): Int = when (slot) {
-        0 -> R.id.wgt_tile_0
-        1 -> R.id.wgt_tile_1
-        2 -> R.id.wgt_tile_2
-        3 -> R.id.wgt_tile_3
-        else -> R.id.wgt_tile_4
+    private fun groupId(count: Int): Int = when (count) {
+        1 -> R.id.wgt_pins_1
+        2 -> R.id.wgt_pins_2
+        3 -> R.id.wgt_pins_3
+        4 -> R.id.wgt_pins_4
+        else -> R.id.wgt_pins_5
+    }
+
+    private fun pinId(count: Int, slot: Int): Int = when (count * 10 + slot) {
+        10 -> R.id.wgt_pin_1_0
+        20 -> R.id.wgt_pin_2_0
+        21 -> R.id.wgt_pin_2_1
+        30 -> R.id.wgt_pin_3_0
+        31 -> R.id.wgt_pin_3_1
+        32 -> R.id.wgt_pin_3_2
+        40 -> R.id.wgt_pin_4_0
+        41 -> R.id.wgt_pin_4_1
+        42 -> R.id.wgt_pin_4_2
+        43 -> R.id.wgt_pin_4_3
+        50 -> R.id.wgt_pin_5_0
+        51 -> R.id.wgt_pin_5_1
+        52 -> R.id.wgt_pin_5_2
+        53 -> R.id.wgt_pin_5_3
+        else -> R.id.wgt_pin_5_4
     }
 
     private fun broadcast(context: Context, action: String, requestCode: Int, profileId: String?): PendingIntent =
@@ -386,7 +409,7 @@ class OrbWidget : AppWidgetProvider() {
     /**
      * The pinned squares: the selected subscription's own pins, the same order its list
      * keeps, the first five. The active one — the running session's while up, the
-     * selection's while down — wears the accent rim.
+     * selection's while down — tells itself apart by its fill.
      */
     private suspend fun resolvePins(context: Context, state: TunnelState): List<WidgetPin> {
         val connection = ConnectionStore.current(context)

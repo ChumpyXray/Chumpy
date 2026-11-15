@@ -37,7 +37,23 @@ class OrbGeometryTest {
     }
 
     @Test
-    fun `the pin tiles are fifths of the short side`() {
+    fun `the pin row grows to its cap and squeezes just enough to fit`() {
         assertEquals(5, WidgetRenderer.PIN_SLOTS)
+        val side = { n: Int -> WidgetRenderer.PinRow.side(n) }
+        // Up to three pins the tiles keep their full size, a little bigger than the
+        // old fifth-of-the-widget; past that the row squeezes to stay inside.
+        assertEquals(0.23f, side(1), 0.0001f)
+        assertEquals(0.23f, side(2), 0.0001f)
+        assertEquals(0.23f, side(3), 0.0001f)
+        assertEquals(0.2225f, side(4), 0.0001f)
+        assertEquals(0.174f, side(5), 0.0001f)
+        // Whatever the count, the row fits: margin, tiles, gaps, and the far margin
+        // never run past the widget's edge.
+        for (n in 1..5) {
+            val right = 2 * WidgetRenderer.PinRow.MARGIN +
+                n * side(n) +
+                (n - 1) * WidgetRenderer.PinRow.GAP
+            org.junit.Assert.assertTrue("row of $n runs past the edge", right <= 1.000001f)
+        }
     }
 }
