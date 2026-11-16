@@ -17,6 +17,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.RemoteException
 import android.os.StrictMode
 import android.util.Log
 import slop.miho.chumpy.MainActivity
@@ -24,6 +25,10 @@ import slop.miho.chumpy.R
 import slop.miho.chumpy.data.ConnectionStore
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -180,6 +185,14 @@ class ChumpyVpnService : VpnService() {
         }
     }
 
+    private val delayWorker = ThreadPoolExecutor(
+        TunnelClient.MAX_PARALLEL_DELAY_TESTS,
+        TunnelClient.MAX_PARALLEL_DELAY_TESTS,
+        20L,
+        TimeUnit.SECONDS,
+        LinkedBlockingQueue(TunnelClient.MAX_PARALLEL_DELAY_TESTS),
+    ) { Thread(it, "vpn-delay") }.apply { allowCoreThreadTimeOut(true) }
+
     private val binder = object : ITunnelService.Stub() {
         override fun connect() {
             // Same path as the intent route: through onStartCommand, in one place.
@@ -194,8 +207,17 @@ class ChumpyVpnService : VpnService() {
 
         override fun trafficBytes(): LongArray = XrayCore.trafficBytes()
 
-        override fun measureDelay(configJson: String?, testUrl: String?): Long =
-            XrayCore.measureOutboundDelay(configJson.orEmpty(), testUrl.orEmpty())
+        override fun measureDelay(configJson: String?, testUrl: String?, result: IDelayResult?) {
+            if (result == null) return
+            try {
+                delayWorker.execute {
+                    val delay = XrayCore.measureOutboundDelay(configJson.orEmpty(), testUrl.orEmpty())
+                    reportDelay(result, delay)
+                }
+            } catch (_: RejectedExecutionException) {
+                reportDelay(result, -1L)
+            }
+        }
 
         override fun measureLiveDelay(testUrl: String?): Long =
             XrayCore.measureLiveDelay(testUrl.orEmpty())
@@ -210,6 +232,14 @@ class ChumpyVpnService : VpnService() {
 
         override fun unregisterCallback(callback: ITunnelCallback?) {
             if (callback != null) XrayCore.unregister(callback)
+        }
+    }
+
+    private fun reportDelay(result: IDelayResult, delay: Long) {
+        try {
+            result.onResult(delay)
+        } catch (_: RemoteException) {
+            // The requesting process has disconnected.
         }
     }
 
@@ -441,6 +471,7 @@ class ChumpyVpnService : VpnService() {
             XrayCore.publish(TunnelStatus(TunnelState.DOWN))
         }
         worker.shutdown()
+        delayWorker.shutdown()
         cancelNotification()
     }
 

@@ -51,6 +51,7 @@ import slop.miho.chumpy.ChumpyApp
 import slop.miho.chumpy.Graph
 import slop.miho.chumpy.R
 import slop.miho.chumpy.core.CoreConfigFile
+import slop.miho.chumpy.core.TunnelClient
 import slop.miho.chumpy.core.TunnelState
 import slop.miho.chumpy.core.TunnelStatus
 import slop.miho.chumpy.core.UpdateIntents
@@ -444,7 +445,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var sweepJob: Job? = null
     private var sweepGeneration = 0L
     private var pingNetworkLost = false
-    private val pingSemaphore = Semaphore(MAX_PING_CONCURRENCY)
+    private val pingSemaphore = Semaphore(TunnelClient.MAX_PARALLEL_DELAY_TESTS)
+    private val regularPingSemaphore = Semaphore(REGULAR_PING_CONCURRENCY)
 
 
     init {
@@ -1073,9 +1075,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startServerSweep(onlyUntested: Boolean) {
         if (pingNetworkLost || (onlyUntested && sweepJob?.isActive == true)) return
-        val profiles = _servers.value.profiles.filter {
-            it.type != ProfileType.BALANCER && (!onlyUntested || it.lastTestAt == null)
-        }
+        val servers = _servers.value.profiles.filter { it.type != ProfileType.BALANCER }
+        val profiles = if (onlyUntested) servers.filter { it.lastTestAt == null } else servers
+        val largeList = servers.size > LARGE_PING_LIST_THRESHOLD
+        val parallelism = if (largeList) TunnelClient.MAX_PARALLEL_DELAY_TESTS else REGULAR_PING_CONCURRENCY
         if (profiles.isEmpty()) return
         val generation = ++sweepGeneration
         sweepJob?.cancel()
@@ -1105,11 +1108,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     try {
                         val next = java.util.concurrent.atomic.AtomicInteger()
-                        List(minOf(queue.size, MAX_PING_CONCURRENCY)) {
+                        List(minOf(queue.size, parallelism)) {
                             launch {
                                 while (currentCoroutineContext().isActive) {
                                     val profile = queue.getOrNull(next.getAndIncrement()) ?: break
-                                    val measured = measureServerDelay(profile, testUrl)
+                                    val measured = if (largeList) {
+                                        measureServerDelay(profile, testUrl)
+                                    } else {
+                                        regularPingSemaphore.withPermit { measureServerDelay(profile, testUrl) }
+                                    }
                                     results.send(profile.id to measured)
                                 }
                             }
@@ -1147,7 +1154,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         individualPings[id]?.cancel()
         individualPings[id] = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
-                val delay = measureServerDelay(profile, connection.value.delayTestUrl)
+                val delay = regularPingSemaphore.withPermit {
+                    measureServerDelay(profile, connection.value.delayTestUrl)
+                }
                 repository.setProfileDelay(id, delay, System.currentTimeMillis())
             } finally {
                 if (individualPings[id] == currentCoroutineContext()[Job]) individualPings.remove(id)
@@ -1416,7 +1425,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
 
     private companion object {
-        const val MAX_PING_CONCURRENCY = 10
+        const val REGULAR_PING_CONCURRENCY = 10
+        const val LARGE_PING_LIST_THRESHOLD = 45
 
         /** The graph window: history older than this falls off the left edge. */
         const val STATS_WINDOW_MILLIS = 15 * 60_000L
