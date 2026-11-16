@@ -506,7 +506,7 @@ fun ServersScreen(
                 // While the fold stands or settles the spring steps aside — see
                 // [movesSettled] — so the rows never chase the fold's own clock.
                 Box(Modifier
-                    .then(if (movesSettled) {
+                    .then(if (movesSettled && !(state.isPinging && state.sort == ServersSort.PING)) {
                         Modifier.animateItem(placementSpec = motion.defaultSpatialSpec())
                     } else {
                         Modifier
@@ -2389,14 +2389,12 @@ private fun ServerRow(
     }
     val iconColor = lerp(colors.onSecondaryContainer, colors.onPrimary, selection)
     val poke = rememberHapticPoke()
-    // The sweep's answers land one by one, and each hand-over on the row's ping chip —
-    // the old number out, the new one flying in — taps the soft poke: a sweep pokes a
-    // dozen rows in a couple of seconds, and the full tap amplitude machine-guns on a
-    // good motor. The first reading a row composes with is its own, not a change.
+    val displayedDelay = profile.testDelayMillis?.takeIf { it >= 0 }
+    val hasPingResult = displayedDelay != null || profile.lastTestAt != null
     val resultPoke = rememberHapticSoftPoke()
     var measured by remember(profile.id) { mutableStateOf(false) }
-    LaunchedEffect(profile.id, profile.testDelayMillis, profile.lastTestAt) {
-        if (measured) resultPoke()
+    LaunchedEffect(profile.id, displayedDelay, hasPingResult) {
+        if (measured && hasPingResult) resultPoke()
         measured = true
     }
 
@@ -2573,33 +2571,29 @@ private fun ServerRow(
                         // animation they asked to shed.
                         if (profile.type != ProfileType.BALANCER) {
                             if (LocalUiSettings.current.simpleTransitions) {
-                                if (profile.testDelayMillis != null || profile.lastTestAt != null) {
+                                if (hasPingResult) {
                                     Text(
-                                        text = "  ·  " + when {
-                                            profile.testDelayMillis == null || profile.testDelayMillis < 0 ->
-                                                stringResource(R.string.servers_offline)
-                                            else ->
-                                                stringResource(R.string.servers_ping_ms, profile.testDelayMillis.toInt())
-                                        },
+                                        text = "  ·  " + (displayedDelay?.let {
+                                            stringResource(R.string.servers_ping_ms, it.toInt())
+                                        } ?: stringResource(R.string.servers_offline)),
                                         color = extraColor,
                                         maxLines = 1,
                                     )
                                 }
                             } else {
                                 AnimatedContent(
-                                    targetState = profile.testDelayMillis to profile.lastTestAt,
+                                    targetState = displayedDelay to hasPingResult,
                                     transitionSpec = {
                                         (fadeIn(motion.defaultEffectsSpec()) +
                                             slideInHorizontally(motion.defaultSpatialSpec()) { it / 2 }) togetherWith
                                             fadeOut(motion.defaultEffectsSpec())
                                     },
                                     label = "ping",
-                                ) { (delay, _) ->
-                                    if (delay != null || profile.lastTestAt != null) {
-                                        val text = when {
-                                            delay == null || delay < 0 -> stringResource(R.string.servers_offline)
-                                            else -> stringResource(R.string.servers_ping_ms, delay.toInt())
-                                        }
+                                ) { (delay, show) ->
+                                    if (show) {
+                                        val text = delay?.let {
+                                            stringResource(R.string.servers_ping_ms, it.toInt())
+                                        } ?: stringResource(R.string.servers_offline)
                                         Text(
                                             text = "  ·  $text",
                                             color = extraColor,
