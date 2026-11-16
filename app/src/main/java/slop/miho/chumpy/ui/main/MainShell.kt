@@ -1114,10 +1114,20 @@ private fun MainPagerStrip(
         // release or the spring home after a failed one. A fresh drag cancels it — the
         // finger takes the page over from wherever the animation has got it.
         var dragAnimJob by remember { mutableStateOf<Job?>(null) }
+        var crossSectionOrigin by remember { mutableStateOf<Int?>(null) }
         LaunchedEffect(targetPosition, directTransitions) {
-            val wasInSettings = stripPosition.targetValue >= settingsOffset
-            if (directTransitions || wasInSettings != settingsOpen) {
+            val previousTarget = stripPosition.targetValue.roundToInt()
+            val crossesSection = (previousTarget >= settingsOffset) != settingsOpen
+            if (directTransitions) {
                 stripPosition.snapTo(targetPosition.toFloat())
+            } else if (crossesSection) {
+                crossSectionOrigin = previousTarget
+                try {
+                    stripPosition.snapTo(previousTarget.toFloat())
+                    stripPosition.animateTo(targetPosition.toFloat(), motion.fastSpatialSpec())
+                } finally {
+                    crossSectionOrigin = null
+                }
             } else {
                 stripPosition.animateTo(targetPosition.toFloat(), motion.defaultSpatialSpec())
             }
@@ -1548,7 +1558,10 @@ private fun MainPagerStrip(
                         }
                     }
                     RefreshRateRequest(active = stripBusy)
-                    nearPages.forEach { position ->
+                    val origin = crossSectionOrigin
+                    val visibleSlots = if (origin != null) listOf(origin, targetPosition).distinct() else nearPages
+                    val pageStep = if (origin != null) abs(targetPosition - origin).coerceAtLeast(1) else 1
+                    visibleSlots.forEach { position ->
                         // Keyed so a page keeps its state as neighbors come and go around it.
                         key(position) {
                             Page(
@@ -1557,6 +1570,7 @@ private fun MainPagerStrip(
                                     if (dragPosition.isNaN()) stripPosition.value else dragPosition
                                 },
                                 pageWidth = pageWidth,
+                                pageStep = pageStep,
                             ) {
                                 destinationPage(position, simple == directTransitions)
                             }
@@ -1573,13 +1587,14 @@ private fun Page(
     position: Int,
     animatedPosition: () -> Float,
     pageWidth: Float,
+    pageStep: Int,
     content: @Composable () -> Unit,
 ) {
     Box(
         Modifier
             .fillMaxSize()
             .graphicsLayer {
-                val offset = position - animatedPosition()
+                val offset = (position - animatedPosition()) / pageStep
                 translationX = offset * pageWidth
                 alpha = if (abs(offset) >= 1f) 0f else 1f
             },
