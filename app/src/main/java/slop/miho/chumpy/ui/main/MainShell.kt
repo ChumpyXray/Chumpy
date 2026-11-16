@@ -1115,8 +1115,12 @@ private fun MainPagerStrip(
         // finger takes the page over from wherever the animation has got it.
         var dragAnimJob by remember { mutableStateOf<Job?>(null) }
         LaunchedEffect(targetPosition, directTransitions) {
-            if (directTransitions) stripPosition.snapTo(targetPosition.toFloat())
-            else stripPosition.animateTo(targetPosition.toFloat(), motion.defaultSpatialSpec())
+            val wasInSettings = stripPosition.targetValue >= settingsOffset
+            if (directTransitions || wasInSettings != settingsOpen) {
+                stripPosition.snapTo(targetPosition.toFloat())
+            } else {
+                stripPosition.animateTo(targetPosition.toFloat(), motion.defaultSpatialSpec())
+            }
         }
 
         // The screen at a strip position: main tabs at 0..2, settings categories after them.
@@ -1247,6 +1251,16 @@ private fun MainPagerStrip(
             dragAnimJob = null
             draggedSlot = targetPosition
             val expressive = expressiveNow.value
+            if (expressive && settingsOpen) {
+                try {
+                    progress.collect {}
+                    onSelectPage(landing)
+                } finally {
+                    dragPosition = Float.NaN
+                    draggedSlot = Int.MIN_VALUE
+                }
+                return@PredictiveBackHandler
+            }
             val from = if (expressive) stripPosition.value else targetPosition.toFloat()
             try {
                 progress.collect { event ->
