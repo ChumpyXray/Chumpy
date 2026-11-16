@@ -12,6 +12,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -967,8 +968,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Switches the servers screen to another subscription. */
     fun selectSubscription(id: String) {
         if (selectedSubscriptionId.value == id) return
-        sweepGeneration++
-        sweepJob?.cancel()
+        cancelServerSweep()
         ConnectionStore.update(app) { it.copy(selectedSubscriptionId = id, selectedProfileId = null) }
         _servers.update { ServersUiState() }
     }
@@ -1012,17 +1012,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * every profile's chip answers with its own number — or a dash, when the server is
      * unreachable.
      */
-    fun pingServers() = startServerSweep(false)
+    fun pingServers() = startServerSweep(onlyUntested = false)
+
+    private fun cancelServerSweep() {
+        sweepGeneration++
+        sweepJob?.cancel()
+        sweepJob = null
+        _servers.update { it.copy(isPinging = false) }
+    }
 
     private fun startServerSweep(onlyUntested: Boolean) {
-        if (sweepJob?.isActive == true) return
+        if (onlyUntested && sweepJob?.isActive == true) return
         val profiles = _servers.value.profiles.filter {
             it.type != ProfileType.BALANCER && (!onlyUntested || it.lastTestAt == null)
         }
         if (profiles.isEmpty()) return
         val generation = ++sweepGeneration
+        sweepJob?.cancel()
         _servers.update { it.copy(isPinging = true) }
-        sweepJob = viewModelScope.launch(Dispatchers.IO) {
+        sweepJob = viewModelScope.launch {
             try {
                 val testUrl = connection.value.delayTestUrl
                 coroutineScope {
@@ -1042,15 +1050,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             launch {
                                 while (currentCoroutineContext().isActive) {
                                     val profile = profiles.getOrNull(next.getAndIncrement()) ?: break
-                                    pingSemaphore.withPermit {
-                                        currentCoroutineContext().ensureActive()
-                                        val measured = try {
-                                            tunnelClient.measureDelay(XrayConfigBuilder.buildTest(profile), testUrl)
-                                        } catch (e: CancellationException) { throw e }
-                                        catch (_: Exception) { null }
-                                        currentCoroutineContext().ensureActive()
-                                        results.send(profile.id to measured)
-                                    }
+                                    val measured = measureServerDelay(profile, testUrl)
+                                    results.send(profile.id to measured)
                                 }
                             }
                         }.joinAll()
@@ -1066,31 +1067,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private val individualPings = mutableSetOf<String>()
+    private suspend fun measureServerDelay(profile: ProfileEntity, testUrl: String): Long? =
+        pingSemaphore.withPermit {
+            withContext(Dispatchers.IO) {
+                try {
+                    tunnelClient.measureDelay(XrayConfigBuilder.buildTest(profile), testUrl)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
+
+    private val individualPings = mutableMapOf<String, Job>()
 
     fun pingServer(id: String) {
         val profile = _servers.value.profiles.firstOrNull { it.id == id } ?: return
-        if (profile.type == ProfileType.BALANCER || !individualPings.add(id)) return
-        viewModelScope.launch {
+        if (profile.type == ProfileType.BALANCER) return
+        individualPings[id]?.cancel()
+        individualPings[id] = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
-                withContext(Dispatchers.IO) {
-                    pingSemaphore.withPermit {
-                        val delay = tunnelClient.measureDelay(
-                            XrayConfigBuilder.buildTest(profile),
-                            connection.value.delayTestUrl,
-                        )
-                        repository.setProfileDelay(id, delay, System.currentTimeMillis())
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                Log.w("Chumpy/Ping", "Individual delay measurement failed")
-                repository.setProfileDelay(id, null, System.currentTimeMillis())
+                val delay = measureServerDelay(profile, connection.value.delayTestUrl)
+                repository.setProfileDelay(id, delay, System.currentTimeMillis())
             } finally {
-                individualPings.remove(id)
+                if (individualPings[id] == currentCoroutineContext()[Job]) individualPings.remove(id)
             }
         }
+        individualPings[id]?.start()
     }
 
     // ------------------------------------------------------------ home + stats loops
