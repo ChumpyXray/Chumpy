@@ -1007,6 +1007,7 @@ private fun TwoPaneShell(
  * slide-up + fade — instead of retargeting the old copy's transition, which only crossfades
  * it back in place and reads as the animation being skipped.
  */
+private class PageTarget(val position: Int)
 
 /**
  * How far the heavy page must travel before the release counts as a page turn — a
@@ -1114,23 +1115,9 @@ private fun MainPagerStrip(
         // release or the spring home after a failed one. A fresh drag cancels it — the
         // finger takes the page over from wherever the animation has got it.
         var dragAnimJob by remember { mutableStateOf<Job?>(null) }
-        var crossSectionOrigin by remember { mutableStateOf<Int?>(null) }
         LaunchedEffect(targetPosition, directTransitions) {
-            val previousTarget = stripPosition.targetValue.roundToInt()
-            val crossesSection = (previousTarget >= settingsOffset) != settingsOpen
-            if (directTransitions) {
-                stripPosition.snapTo(targetPosition.toFloat())
-            } else if (crossesSection) {
-                crossSectionOrigin = previousTarget
-                try {
-                    stripPosition.snapTo(previousTarget.toFloat())
-                    stripPosition.animateTo(targetPosition.toFloat(), motion.fastSpatialSpec())
-                } finally {
-                    crossSectionOrigin = null
-                }
-            } else {
-                stripPosition.animateTo(targetPosition.toFloat(), motion.defaultSpatialSpec())
-            }
+            if (directTransitions) stripPosition.snapTo(targetPosition.toFloat())
+            else stripPosition.animateTo(targetPosition.toFloat(), motion.defaultSpatialSpec())
         }
 
         // The screen at a strip position: main tabs at 0..2, settings categories after them.
@@ -1261,16 +1248,6 @@ private fun MainPagerStrip(
             dragAnimJob = null
             draggedSlot = targetPosition
             val expressive = expressiveNow.value
-            if (expressive && settingsOpen) {
-                try {
-                    progress.collect {}
-                    onSelectPage(landing)
-                } finally {
-                    dragPosition = Float.NaN
-                    draggedSlot = Int.MIN_VALUE
-                }
-                return@PredictiveBackHandler
-            }
             val from = if (expressive) stripPosition.value else targetPosition.toFloat()
             try {
                 progress.collect { event ->
@@ -1484,8 +1461,12 @@ private fun MainPagerStrip(
                     // are composed, the old fades out while the new slides up from below and
                     // fades in. No intermediate pages are rendered or scrolled past, which
                     // is what lags the weaker devices.
+                    // Fresh identity per navigation: every switch gets the full slide, even
+                    // when the previous one is still running (see PageTarget).
+                    val target = remember(targetPosition) { PageTarget(targetPosition) }
                     AnimatedContent(
-                        targetState = targetPosition,
+                        targetState = target,
+                        contentKey = { if (controller) it.position else it },
                         transitionSpec = {
                             (fadeIn(if (controller) motion.fastEffectsSpec() else motion.defaultEffectsSpec()) +
                                 slideInVertically(if (controller) motion.fastSpatialSpec() else motion.defaultSpatialSpec()) {
@@ -1493,7 +1474,7 @@ private fun MainPagerStrip(
                                 }) togetherWith fadeOut(motion.fastEffectsSpec())
                         },
                         label = "direct page switch",
-                    ) { slot ->
+                    ) { page ->
                         // The switch plays out over a spring: ask the display for its high
                         // gear while it runs, so a dynamically-refreshed screen doesn't
                         // idle at 60. The heavy swipe's own travel rides a graphics layer
@@ -1507,6 +1488,7 @@ private fun MainPagerStrip(
                         // disposal: when its fade ends and it finally leaves, it takes the
                         // drag's states with it — unless a newer drag has already claimed
                         // them.
+                        val slot = page.position
                         val draggedSlotNow = rememberUpdatedState(draggedSlot)
                         DisposableEffect(slot) {
                             onDispose {
@@ -1558,10 +1540,7 @@ private fun MainPagerStrip(
                         }
                     }
                     RefreshRateRequest(active = stripBusy)
-                    val origin = crossSectionOrigin
-                    val visibleSlots = if (origin != null) listOf(origin, targetPosition).distinct() else nearPages
-                    val pageStep = if (origin != null) abs(targetPosition - origin).coerceAtLeast(1) else 1
-                    visibleSlots.forEach { position ->
+                    nearPages.forEach { position ->
                         // Keyed so a page keeps its state as neighbors come and go around it.
                         key(position) {
                             Page(
@@ -1570,7 +1549,6 @@ private fun MainPagerStrip(
                                     if (dragPosition.isNaN()) stripPosition.value else dragPosition
                                 },
                                 pageWidth = pageWidth,
-                                pageStep = pageStep,
                             ) {
                                 destinationPage(position, simple == directTransitions)
                             }
@@ -1587,17 +1565,12 @@ private fun Page(
     position: Int,
     animatedPosition: () -> Float,
     pageWidth: Float,
-    pageStep: Int,
     content: @Composable () -> Unit,
 ) {
     Box(
         Modifier
             .fillMaxSize()
-            .graphicsLayer {
-                val offset = (position - animatedPosition()) / pageStep
-                translationX = offset * pageWidth
-                alpha = if (abs(offset) >= 1f) 0f else 1f
-            },
+            .graphicsLayer { translationX = (position - animatedPosition()) * pageWidth },
     ) {
         content()
     }
