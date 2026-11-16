@@ -1007,7 +1007,6 @@ private fun TwoPaneShell(
  * slide-up + fade — instead of retargeting the old copy's transition, which only crossfades
  * it back in place and reads as the animation being skipped.
  */
-private class PageTarget(val position: Int)
 
 /**
  * How far the heavy page must travel before the release counts as a page turn — a
@@ -1461,12 +1460,8 @@ private fun MainPagerStrip(
                     // are composed, the old fades out while the new slides up from below and
                     // fades in. No intermediate pages are rendered or scrolled past, which
                     // is what lags the weaker devices.
-                    // Fresh identity per navigation: every switch gets the full slide, even
-                    // when the previous one is still running (see PageTarget).
-                    val target = remember(targetPosition) { PageTarget(targetPosition) }
                     AnimatedContent(
-                        targetState = target,
-                        contentKey = { if (controller) it.position else it },
+                        targetState = targetPosition,
                         transitionSpec = {
                             (fadeIn(if (controller) motion.fastEffectsSpec() else motion.defaultEffectsSpec()) +
                                 slideInVertically(if (controller) motion.fastSpatialSpec() else motion.defaultSpatialSpec()) {
@@ -1474,7 +1469,7 @@ private fun MainPagerStrip(
                                 }) togetherWith fadeOut(motion.fastEffectsSpec())
                         },
                         label = "direct page switch",
-                    ) { page ->
+                    ) { slot ->
                         // The switch plays out over a spring: ask the display for its high
                         // gear while it runs, so a dynamically-refreshed screen doesn't
                         // idle at 60. The heavy swipe's own travel rides a graphics layer
@@ -1488,7 +1483,6 @@ private fun MainPagerStrip(
                         // disposal: when its fade ends and it finally leaves, it takes the
                         // drag's states with it — unless a newer drag has already claimed
                         // them.
-                        val slot = page.position
                         val draggedSlotNow = rememberUpdatedState(draggedSlot)
                         DisposableEffect(slot) {
                             onDispose {
@@ -1570,7 +1564,11 @@ private fun Page(
     Box(
         Modifier
             .fillMaxSize()
-            .graphicsLayer { translationX = (position - animatedPosition()) * pageWidth },
+            .graphicsLayer {
+                val offset = position - animatedPosition()
+                translationX = offset * pageWidth
+                alpha = if (abs(offset) >= 1f) 0f else 1f
+            },
     ) {
         content()
     }
