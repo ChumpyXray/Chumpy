@@ -1083,6 +1083,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sweepJob = viewModelScope.launch {
             try {
                 val testUrl = connection.value.delayTestUrl
+                val queue = if (onlyUntested) profiles else withContext(Dispatchers.Default) {
+                    profiles.sortedBy { profile ->
+                        when {
+                            (profile.testDelayMillis ?: -1) >= 0 -> 0
+                            profile.lastTestAt == null -> 1
+                            else -> 2
+                        }
+                    }
+                }
                 coroutineScope {
                     val results = Channel<Pair<String, Long?>>(Channel.UNLIMITED)
                     val writer = launch {
@@ -1096,10 +1105,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     try {
                         val next = java.util.concurrent.atomic.AtomicInteger()
-                        List(minOf(profiles.size, MAX_PING_CONCURRENCY)) {
+                        List(minOf(queue.size, MAX_PING_CONCURRENCY)) {
                             launch {
                                 while (currentCoroutineContext().isActive) {
-                                    val profile = profiles.getOrNull(next.getAndIncrement()) ?: break
+                                    val profile = queue.getOrNull(next.getAndIncrement()) ?: break
                                     val measured = measureServerDelay(profile, testUrl)
                                     results.send(profile.id to measured)
                                 }
