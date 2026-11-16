@@ -4,6 +4,10 @@ import androidx.core.content.edit
 import androidx.core.net.toUri
 import android.app.Application
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -21,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -35,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -436,7 +442,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val connectGeneration = java.util.concurrent.atomic.AtomicInteger()
     private val configurationMutex = Mutex()
     private var sweepJob: Job? = null
-    @Volatile private var sweepGeneration = 0L
+    private var sweepGeneration = 0L
+    private var pingNetworkLost = false
     private val pingSemaphore = Semaphore(MAX_PING_CONCURRENCY)
 
 
@@ -617,6 +624,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         observeProfiles()
+        observePingNetwork()
         observeTunnelForHome()
         observeTunnelForStats()
         observeIdentityChips()
@@ -1006,6 +1014,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ------------------------------------------------------------ real pings
 
+    private fun observePingNetwork() {
+        val connectivity = app.getSystemService(ConnectivityManager::class.java) ?: return
+        viewModelScope.launch {
+            callbackFlow<Network?> {
+                val request = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                    .build()
+                val callback = object : ConnectivityManager.NetworkCallback() {
+                    private var upstream: Network? = null
+
+                    override fun onAvailable(network: Network) {
+                        upstream = network
+                        trySend(network)
+                    }
+
+                    override fun onLost(network: Network) {
+                        if (upstream != network) return
+                        upstream = null
+                        trySend(null)
+                    }
+                }
+                try {
+                    connectivity.requestNetwork(request, callback)
+                } catch (e: RuntimeException) {
+                    Log.w("Chumpy/Ping", "Cannot watch the underlying network", e)
+                    close()
+                    return@callbackFlow
+                }
+                awaitClose { connectivity.unregisterNetworkCallback(callback) }
+            }.distinctUntilChanged().drop(1).collect { network ->
+                pingNetworkLost = network == null
+                cancelServerSweep()
+                individualPings.values.toList().forEach { it.cancel() }
+                if (!pingNetworkLost) startServerSweep(onlyUntested = false)
+            }
+        }
+    }
+
     /**
      * A real-ping sweep over the current list, one measurement core per profile in the
      * ":core" process, a handful at a time. Pull-to-refresh on the servers screen is this;
@@ -1022,7 +1069,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startServerSweep(onlyUntested: Boolean) {
-        if (onlyUntested && sweepJob?.isActive == true) return
+        if (pingNetworkLost || (onlyUntested && sweepJob?.isActive == true)) return
         val profiles = _servers.value.profiles.filter {
             it.type != ProfileType.BALANCER && (!onlyUntested || it.lastTestAt == null)
         }
@@ -1084,7 +1131,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun pingServer(id: String) {
         val profile = _servers.value.profiles.firstOrNull { it.id == id } ?: return
-        if (profile.type == ProfileType.BALANCER) return
+        if (pingNetworkLost || profile.type == ProfileType.BALANCER) return
         individualPings[id]?.cancel()
         individualPings[id] = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
