@@ -588,22 +588,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         .map { rows -> id to rows }
                         .flowOn(Dispatchers.Default)
                 }
-                .combine(connection) { (id, rows), conn -> Triple(id, rows, conn) }
-                .collect { (id, rows, conn) ->
-                    val requested = conn.selectedSubscriptionId
+                .combine(
+                    connection.map { Triple(it.selectedSubscriptionId, it.selectedProfileId, it.serversSort) }
+                        .distinctUntilChanged()
+                ) { (id, rows), selection -> Triple(id, rows, selection) }
+                .collect { (id, rows, selection) ->
+                    val (requested, selectedProfileId, sortMode) = selection
                     if (requested != null && requested != id &&
                         (requested == STANDALONE_SUBSCRIPTION_ID || subscriptions.value.any { it.id == requested })) {
                         return@collect
                     }
                     val (visible, concealed, totalServers) = withContext(Dispatchers.Default) {
-                        val sort = conn.serversSort.comparator()
+                        val sort = sortMode.comparator()
                         Triple(
                             rows.filterNot { it.hidden || it.concealed }.sortedWith(sort),
                             rows.filter { it.concealed && !it.hidden }.sortedWith(sort),
                             rows.filter { it.type != ProfileType.BALANCER }.distinctBy { it.linkKey }.size,
                         )
                     }
-                    if (visible.none { it.id == conn.selectedProfileId } && visible.isNotEmpty()) {
+                    if (visible.none { it.id == selectedProfileId } && visible.isNotEmpty()) {
                         ConnectionStore.update(app) { current ->
                             if (current.selectedSubscriptionId == requested) current.copy(selectedProfileId = visible.first().id)
                             else current
@@ -611,7 +614,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     _servers.update { state ->
                         state.copy(profiles = visible, concealed = concealed,
-                            sort = conn.serversSort, totalServers = totalServers,
+                            sort = sortMode, totalServers = totalServers,
                             selectedProfileId = visible.firstOrNull { it.id == connection.value.selectedProfileId }?.id
                                 ?: visible.firstOrNull()?.id)
                     }
