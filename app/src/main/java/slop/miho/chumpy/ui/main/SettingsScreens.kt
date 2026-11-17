@@ -1156,6 +1156,7 @@ fun ConnectionScreen(
                 {
                     HappToggleRow(
                         checked = settings.happSpoof,
+                        incy = settings.incySpoof,
                         onToggle = { enabled ->
                             onChangeSettings { it.copy(happSpoof = enabled) }
                             if (enabled) happOpen = false
@@ -1171,6 +1172,15 @@ fun ConnectionScreen(
             ),
             rows = listOf(
                 {
+                    ToggleRow(
+                        title = stringResource(R.string.incy_spoof),
+                        supporting = null,
+                        icon = R.drawable.ic_settings,
+                        checked = settings.incySpoof,
+                        onChange = { enabled -> onChangeSettings { it.copy(incySpoof = enabled) } },
+                    )
+                },
+                {
                     HappRegenerateRow(
                         onRegenerate = { happRegenPending = true },
                     )
@@ -1178,8 +1188,12 @@ fun ConnectionScreen(
                 {
                     HappFieldRow(
                         label = stringResource(R.string.happ_app_version),
-                        value = settings.happAppVersion,
-                        onChange = { value -> onChangeSettings { it.copy(happAppVersion = value) } },
+                        value = if (settings.incySpoof) settings.incyAppVersion else settings.happAppVersion,
+                        onChange = { value ->
+                            onChangeSettings {
+                                if (it.incySpoof) it.copy(incyAppVersion = value) else it.copy(happAppVersion = value)
+                            }
+                        },
                     )
                 },
                 {
@@ -1523,6 +1537,7 @@ private fun TestUrlRow(
 @Composable
 private fun HappToggleRow(
     checked: Boolean,
+    incy: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -1553,7 +1568,7 @@ private fun HappToggleRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.happ_title),
+                text = stringResource(if (incy) R.string.incy_spoof else R.string.happ_title),
                 style = MaterialTheme.typography.bodyLarge,
                 color = colors.onSurface,
             )

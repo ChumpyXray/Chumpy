@@ -343,4 +343,5 @@
     <string name="tunnel_error_timeout">Слишком долго ждали ответа. Попробуйте снова или выберите другой сервер.</string>
     <string name="tunnel_error_stopping">VPN ещё отключается. Подождите немного и попробуйте снова.</string>
     <string name="tunnel_error_storage">На устройстве закончилось место. Освободите немного памяти и попробуйте снова.</string>
+    <string name="incy_spoof">Маскировка под INCY</string>
 </resources>

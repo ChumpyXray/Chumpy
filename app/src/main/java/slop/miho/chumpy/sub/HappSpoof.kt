@@ -40,6 +40,7 @@ object HappSpoof {
         val locale: String,
         val userId: String,
         val hwid: String,
+        val incy: Boolean = false,
     )
 
     /** A 20-digit user id, the shape Happ's own ids carry. */
@@ -66,7 +67,8 @@ object HappSpoof {
     fun UiSettings.happFingerprint(): Fingerprint? {
         if (!happSpoof) return null
         return Fingerprint(
-            appVersion = happAppVersion.ifBlank { DEFAULT_APP_VERSION },
+            appVersion = if (incySpoof) incyAppVersion.ifBlank { "1.0" } else happAppVersion.ifBlank { DEFAULT_APP_VERSION },
+            incy = incySpoof,
             os = happOs.ifBlank { DEFAULT_OS },
             osVersion = happOsVersion.ifBlank { defaultOsVersion() },
             deviceModel = happDeviceModel.ifBlank { defaultDeviceModel() },
@@ -81,14 +83,20 @@ object HappSpoof {
      * Chumpy and its build version, and ends with the existing client identifier.
      */
     fun headers(fingerprint: Fingerprint): Map<String, String> = mapOf(
-        "User-Agent" to "Happ/${fingerprint.appVersion}/${fingerprint.os}/Chumpy/${BuildConfig.VERSION_NAME}/${fingerprint.userId}",
+        "User-Agent" to if (fingerprint.incy) {
+            "INCY/${fingerprint.appVersion}/${fingerprint.os}"
+        } else {
+            "Happ/${fingerprint.appVersion}/${fingerprint.os}/Chumpy/${BuildConfig.VERSION_NAME}/${fingerprint.userId}"
+        },
         "x-device-locale" to fingerprint.locale,
         "x-hwid" to fingerprint.hwid,
         "x-device-os" to fingerprint.os,
         "x-ver-os" to fingerprint.osVersion,
         "x-device-model" to fingerprint.deviceModel,
         "accept-encoding" to "gzip",
-    )
+    ).let { headers ->
+        if (fingerprint.incy) headers + ("X-Device-ID" to fingerprint.hwid) else headers
+    }
 
     fun apply(connection: HttpURLConnection, fingerprint: Fingerprint) {
         headers(fingerprint).forEach { (name, value) -> connection.setRequestProperty(name, value) }

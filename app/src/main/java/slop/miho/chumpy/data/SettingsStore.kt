@@ -127,6 +127,8 @@ data class UiSettings(
     // the device's honest defaults and a generated identity the panel keeps seeing.
     val happSpoof: Boolean = true,
     val happAppVersion: String = "",
+    val incySpoof: Boolean = false,
+    val incyAppVersion: String = "1.0",
     val happOs: String = "",
     val happOsVersion: String = "",
     val happDeviceModel: String = "",
@@ -305,6 +307,8 @@ object SettingsStore {
             maskAddresses = prefs.getBoolean(KEY_MASK_ADDRESSES, false),
             notificationsPermissionAsked = prefs.getBoolean(KEY_NOTIFICATIONS_ASKED, false),
             happSpoof = prefs.getBoolean(KEY_HAPP_SPOOF, true),
+            incySpoof = prefs.getBoolean("incy_spoof", false),
+            incyAppVersion = prefs.getString("incy_app_version", "1.0").orEmpty().ifBlank { "1.0" },
             happAppVersion = prefs.getString(KEY_HAPP_APP_VERSION, null).orEmpty()
                 .ifBlank { HappSpoof.DEFAULT_APP_VERSION },
             happOs = prefs.getString(KEY_HAPP_OS, null).orEmpty().ifBlank { "Android" },
@@ -365,6 +369,8 @@ object SettingsStore {
             .putBoolean(KEY_MASK_ADDRESSES, settings.maskAddresses)
             .putBoolean(KEY_NOTIFICATIONS_ASKED, settings.notificationsPermissionAsked)
             .putBoolean(KEY_HAPP_SPOOF, settings.happSpoof)
+            .putBoolean("incy_spoof", settings.incySpoof)
+            .putString("incy_app_version", settings.incyAppVersion)
             .putString(KEY_HAPP_APP_VERSION, settings.happAppVersion)
             .putString(KEY_HAPP_OS, settings.happOs)
             .putString(KEY_HAPP_OS_VERSION, settings.happOsVersion)
