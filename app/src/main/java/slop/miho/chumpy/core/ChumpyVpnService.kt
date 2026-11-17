@@ -116,6 +116,8 @@ class ChumpyVpnService : VpnService() {
         /** The TUN's own address; the core receives everything routed into it. */
         private const val TUN_ADDRESS = "172.19.0.1"
         private const val TUN_PREFIX = 30
+        private const val TUN_IPV6_ADDRESS = "fd00:19::1"
+        private const val TUN_IPV6_PREFIX = 126
         private const val TUN_MTU = 1500
 
         /**
@@ -691,11 +693,15 @@ class ChumpyVpnService : VpnService() {
         val builder = Builder()
             .setMtu(TUN_MTU)
             .addAddress(TUN_ADDRESS, TUN_PREFIX)
+            .addAddress(TUN_IPV6_ADDRESS, TUN_IPV6_PREFIX)
             .apply {
                 if (bypassLan) {
                     ROUTED_IP_BLOCKS.forEach { (address, prefix) -> addRoute(address, prefix) }
+                    // Global unicast only, so local IPv6 discovery and private LAN stay local.
+                    addRoute("2000::", 3)
                 } else {
                     addRoute("0.0.0.0", 0)
+                    addRoute("::", 0)
                 }
             }
             .addDnsServer("1.1.1.1")
