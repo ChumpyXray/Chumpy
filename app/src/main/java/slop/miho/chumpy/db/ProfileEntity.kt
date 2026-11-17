@@ -172,6 +172,11 @@ data class ProfileEntity(
     val linkKey: String = "",
 )
 
+fun ProfileEntity.displayLabel(maskAddresses: Boolean): String {
+    val generatedNaiveName = type == ProfileType.NAIVE && remarks == "NaiveProxy · $server"
+    return if (remarks.isNotEmpty() && !generatedNaiveName) remarks else if (maskAddresses) "" else server
+}
+
 /** The canonical digest used for update diffing; see [linkKey]. */
 fun ProfileEntity.computeLinkKey(): String {
     // A balancer is its name and its strategy, not its members: the panel reshuffles the

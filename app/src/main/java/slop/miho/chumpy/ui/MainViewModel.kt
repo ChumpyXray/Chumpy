@@ -74,6 +74,7 @@ import slop.miho.chumpy.db.ProfileType
 import slop.miho.chumpy.db.STANDALONE_SUBSCRIPTION_ID
 import slop.miho.chumpy.db.SubscriptionEntity
 import slop.miho.chumpy.db.balancerMemberKeys
+import slop.miho.chumpy.db.displayLabel
 import slop.miho.chumpy.sub.SubscriptionRepository
 import slop.miho.chumpy.xray.XrayConfigBuilder
 import slop.miho.chumpy.xray.RoutingMode
@@ -719,7 +720,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val profile = active?.profile ?: selected
                 // The flag panels put at the front of the name moves into the card's icon
                 // slot; the card's header says subscription first, region second.
-                val split = profile?.let { p -> splitLeadingFlag(p.remarks.ifEmpty { if (ui.maskAddresses) "" else p.server }) }
+                val split = profile?.let { p -> splitLeadingFlag(p.displayLabel(ui.maskAddresses)) }
                 // The addresses' curtain reaches Home too: a nameless server's card
                 // keeps the address out of sight — the region line stands empty
                 // rather than saying where it goes.
@@ -804,7 +805,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         requestContext.ensureActive()
                         if (generation == connectGeneration.get()) {
                             CoreConfigFile.write(app, config,
-                                resolvedProfile.remarks.ifEmpty { if (settings.value.maskAddresses) "" else resolvedProfile.server },
+                                resolvedProfile.displayLabel(settings.value.maskAddresses),
                                 subscriptionName, resolvedProfile.id, resolvedProfile.subscriptionId, resolvedProfile.server)
                             tunnelClient.connect()
                         }

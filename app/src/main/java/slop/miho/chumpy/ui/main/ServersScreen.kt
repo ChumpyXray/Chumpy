@@ -157,6 +157,7 @@ import slop.miho.chumpy.db.ProfileType
 import slop.miho.chumpy.db.STANDALONE_SUBSCRIPTION_ID
 import slop.miho.chumpy.db.SubscriptionEntity
 import slop.miho.chumpy.db.balancerMemberKeys
+import slop.miho.chumpy.db.displayLabel
 import slop.miho.chumpy.ui.ServersUiState
 import slop.miho.chumpy.ui.scan.ScannerActivity
 import slop.miho.chumpy.ui.components.ActionTile
@@ -2332,7 +2333,7 @@ private fun ServerRow(
     // one row instead of the whole scheme. The flag itself rides the icon slot, like the
     // country flags do, and comes off the name.
     val (pride, prideStripped) = splitLeadingPrideFlag(
-        profile.remarks.ifEmpty { if (LocalUiSettings.current.maskAddresses) "" else profile.server },
+        profile.displayLabel(LocalUiSettings.current.maskAddresses),
     )
     // The flag the panel put at the front of the name moves into the icon slot; the
     // headline shows the name without it.

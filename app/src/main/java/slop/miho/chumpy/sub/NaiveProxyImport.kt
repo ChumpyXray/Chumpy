@@ -25,8 +25,7 @@ internal object NaiveProxyImport {
             id = "",
             subscriptionId = null,
             type = ProfileType.NAIVE,
-            remarks = (config["remarks"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
-                ?: "NaiveProxy · $server",
+            remarks = (config["remarks"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty(),
             server = server,
             serverPort = port,
             username = LinkUtils.decodeURIComponent(credentials[0]),
