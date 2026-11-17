@@ -2398,7 +2398,7 @@ private fun ServerRow(
         measured = true
     }
 
-    val canPing = profile.type != ProfileType.BALANCER && !profile.concealed
+    val canPing = !profile.concealed
     val swipeEnabled = canPing && !dimmed && menu?.open != true &&
         LocalInputMode.current != InputMode.CONTROLLER
     val pingLabel = stringResource(R.string.server_ping_action)
@@ -2569,7 +2569,7 @@ private fun ServerRow(
                         // hand-over rides a full transition per row, a price the weak
                         // devices the mode is for pay on every page open, for an
                         // animation they asked to shed.
-                        if (profile.type != ProfileType.BALANCER) {
+                        run {
                             if (LocalUiSettings.current.simpleTransitions) {
                                 if (hasPingResult) {
                                     Text(

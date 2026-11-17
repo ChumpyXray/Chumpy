@@ -620,7 +620,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             selectedProfileId = visible.firstOrNull { it.id == connection.value.selectedProfileId }?.id
                                 ?: visible.firstOrNull()?.id)
                     }
-                    if (visible.any { it.type != ProfileType.BALANCER && it.lastTestAt == null }) {
+                    if (visible.any { it.lastTestAt == null }) {
                         startServerSweep(true)
                     }
                 }
@@ -1073,19 +1073,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _servers.update { it.copy(isPinging = false) }
     }
 
-    private fun startServerSweep(onlyUntested: Boolean) {
+    private fun startServerSweep(onlyUntested: Boolean, targetProfileId: String? = null) {
         if (pingNetworkLost || (onlyUntested && sweepJob?.isActive == true)) return
-        val servers = _servers.value.profiles.filter { it.type != ProfileType.BALANCER }
-        val profiles = if (onlyUntested) servers.filter { it.lastTestAt == null } else servers
-        val largeList = servers.size > LARGE_PING_LIST_THRESHOLD
-        val parallelism = if (largeList) TunnelClient.MAX_PARALLEL_DELAY_TESTS else REGULAR_PING_CONCURRENCY
-        if (profiles.isEmpty()) return
+        val targets = _servers.value.profiles.filter {
+            (targetProfileId == null || it.id == targetProfileId) && (!onlyUntested || it.lastTestAt == null)
+        }
+        if (targets.isEmpty()) return
+        val subscriptionId = selectedSubscriptionId.value?.takeUnless { it == STANDALONE_SUBSCRIPTION_ID }
         val generation = ++sweepGeneration
         sweepJob?.cancel()
         _servers.update { it.copy(isPinging = true) }
         sweepJob = viewModelScope.launch {
             try {
                 val testUrl = connection.value.delayTestUrl
+                val allRows = repository.profilesOf(subscriptionId).first()
+                val balancers = targets.filter { it.type == ProfileType.BALANCER }
+                    .associateWith { balancer ->
+                        val keys = balancer.balancerMemberKeys.toSet()
+                        val members = allRows.filter { it.type != ProfileType.BALANCER && it.linkKey in keys }
+                        members.ifEmpty { allRows.filter { it.type != ProfileType.BALANCER } }
+                    }
+                val profiles = (targets.filter { it.type != ProfileType.BALANCER } + balancers.values.flatten())
+                    .distinctBy { it.id }
+                val parallelism = if (profiles.size > LARGE_PING_LIST_THRESHOLD) {
+                    TunnelClient.MAX_PARALLEL_DELAY_TESTS
+                } else {
+                    REGULAR_PING_CONCURRENCY
+                }
+                val largeList = parallelism > REGULAR_PING_CONCURRENCY
                 val queue = if (onlyUntested) profiles else withContext(Dispatchers.Default) {
                     profiles.sortedBy { profile ->
                         when {
@@ -1098,11 +1113,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 coroutineScope {
                     val results = Channel<Pair<String, Long?>>(Channel.UNLIMITED)
                     val writer = launch {
+                        val measuredMembers = mutableMapOf<String, Long?>()
+                        val publishedBalancers = mutableSetOf<String>()
+                        val emptyBalancers = balancers.filterValues { it.isEmpty() }.keys
+                        if (emptyBalancers.isNotEmpty()) {
+                            repository.setProfileDelays(emptyBalancers.map { it.id to null }, System.currentTimeMillis())
+                            publishedBalancers.addAll(emptyBalancers.map { it.id })
+                        }
                         while (true) {
                             val first = results.receiveCatching().getOrNull() ?: break
                             val batch = mutableListOf(first)
                             delay(150)
                             while (true) batch.add(results.tryReceive().getOrNull() ?: break)
+                            batch.forEach { (id, delay) -> measuredMembers[id] = delay }
+                            for ((balancer, members) in balancers) {
+                                if (balancer.id in publishedBalancers || members.any { it.id !in measuredMembers }) continue
+                                val best = members.mapNotNull { measuredMembers[it.id]?.takeIf { value -> value >= 0 } }
+                                    .minOrNull()
+                                batch.add(balancer.id to best)
+                                publishedBalancers.add(balancer.id)
+                            }
                             repository.setProfileDelays(batch, System.currentTimeMillis())
                         }
                     }
@@ -1150,7 +1180,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun pingServer(id: String) {
         val profile = _servers.value.profiles.firstOrNull { it.id == id } ?: return
-        if (pingNetworkLost || profile.type == ProfileType.BALANCER) return
+        if (pingNetworkLost) return
+        if (profile.type == ProfileType.BALANCER) {
+            startServerSweep(onlyUntested = false, targetProfileId = id)
+            return
+        }
         individualPings[id]?.cancel()
         individualPings[id] = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
