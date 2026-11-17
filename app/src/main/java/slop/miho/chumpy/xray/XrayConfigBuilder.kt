@@ -89,7 +89,8 @@ object XrayConfigBuilder {
         require(profile.type != ProfileType.BALANCER || members.isNotEmpty()) { "Balancer has no usable servers" }
         val balancerMembers = if (profile.type == ProfileType.BALANCER) members else emptyList()
         val strategy = profile.balancerStrategy.ifEmpty { "random" }
-        return buildJsonObject {
+        val isNaive = profile.type == ProfileType.NAIVE
+        val config = buildJsonObject {
             put("stats", buildJsonObject {})
             put("log", buildJsonObject {
                 put("access", "none")
@@ -162,7 +163,7 @@ object XrayConfigBuilder {
             "outbounds",
             buildJsonArray {
                 if (balancerMembers.isEmpty()) {
-                    add(OutboundBuilder.build(profile, PROXY_TAG))
+                    if (!isNaive) add(OutboundBuilder.build(profile, PROXY_TAG))
                 } else {
                     balancerMembers.forEachIndexed { index, member ->
                         add(OutboundBuilder.build(member, memberTag(index)))
@@ -229,14 +230,17 @@ object XrayConfigBuilder {
                 )
             },
         )
-        }.toString()
+        }
+        return if (isNaive) NaiveTunnelConfig.attach(config, profile) else config.toString()
     }
 
     /**
      * The bare document for [slop.miho.chumpy.core.XrayCore.measureOutboundDelay]: one
      * outbound, no inbounds — the measurement core dials the test URL through it.
      */
-    fun buildTest(profile: ProfileEntity): String = buildJsonObject {
+    fun buildTest(profile: ProfileEntity): String {
+        if (profile.type == ProfileType.NAIVE) return NaiveTunnelConfig.buildProbe(profile)
+        return buildJsonObject {
         put("log", buildJsonObject { put("loglevel", "warning") })
         put("inbounds", buildJsonArray {})
         put(
@@ -250,7 +254,8 @@ object XrayConfigBuilder {
                 put("rules", buildJsonArray {})
             },
         )
-    }.toString()
+        }.toString()
+    }
 
     private fun kotlinx.serialization.json.JsonObjectBuilder.sniffing() {
         put(

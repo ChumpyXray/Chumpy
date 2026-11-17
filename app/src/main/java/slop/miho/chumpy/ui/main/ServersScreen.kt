@@ -2710,6 +2710,7 @@ private fun protocolLabel(profile: ProfileEntity): String? = when (profile.type)
     slop.miho.chumpy.db.ProfileType.HTTP -> if (profile.security == "tls") "https" else "http"
     slop.miho.chumpy.db.ProfileType.WIREGUARD -> "wireguard"
     slop.miho.chumpy.db.ProfileType.HYSTERIA2 -> "hysteria2"
+    slop.miho.chumpy.db.ProfileType.NAIVE -> "naive"
     // The supporting line of a balancer row is its own — see balancerStrategyLabel.
     slop.miho.chumpy.db.ProfileType.BALANCER -> null
 }

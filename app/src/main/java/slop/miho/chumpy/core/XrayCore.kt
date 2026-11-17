@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import slop.miho.chumpy.data.DailyTrafficStore
+import slop.miho.chumpy.xray.NaiveTunnelConfig
 
 object XrayCore {
     private const val TAG = "Chumpy/XrayCore"
@@ -50,6 +51,7 @@ object XrayCore {
 
     @Volatile
     private var controller: Controller? = null
+    private var naiveController: Controller? = null
 
     @Volatile private var terminating = false
 
@@ -188,18 +190,27 @@ object XrayCore {
     fun startLoop(configJson: String, fd: Int): Exception? {
         if (terminating) return IllegalStateException("Core shutdown is still pending")
         tunFd = fd
+        var bridgeCore: Controller? = null
         try {
             awaitInit()
             initFailed?.let { return IllegalStateException(it) }
             val core = controller ?: Cucore.newController().also { controller = it }
-            core.startTun(configJson, fd.toLong())
+            val bridge = NaiveTunnelConfig.prepareBridge(configJson)
+            if (bridge != null) {
+                bridgeCore = Cucore.newController()
+                bridgeCore.start("sing-box", bridge.singBox)
+            }
+            core.startTun(bridge?.xray ?: configJson, fd.toLong())
+            naiveController = bridgeCore
             synchronized(this) {
                 if (lastUiTrafficAt == 0L) lastUiTrafficAt = SystemClock.elapsedRealtime()
             }
             isRunning = true
-            log(Log.INFO, "VPN started (${core.engine()})")
+            val engine = if (bridgeCore == null) core.engine() else "xray + sing-box NaiveProxy"
+            log(Log.INFO, "VPN started ($engine)")
             return null
         } catch (e: Exception) {
+            bridgeCore?.let { runCatching { it.stop() } }
             isRunning = false
             return e
         }
@@ -223,11 +234,19 @@ object XrayCore {
             isRunning = false
             controller
         } ?: return
+        val bridgeCore = naiveController
+        naiveController = null
         val stopper = Thread {
             try {
                 core.stop()
             } catch (e: Exception) {
                 log(Log.WARN, "stopLoop failed", e)
+            } finally {
+                try {
+                    bridgeCore?.stop()
+                } catch (e: Exception) {
+                    log(Log.WARN, "NaiveProxy shutdown failed", e)
+                }
             }
         }
         stopper.start()
@@ -275,7 +294,13 @@ object XrayCore {
         try {
             awaitInit()
             initFailed?.let { return -1L }
-            return DelayProbe.measure(testUrl) { target -> Cucore.measureXrayOutboundDelay(configJson, target) }
+            return DelayProbe.measure(testUrl) { target ->
+                if (NaiveTunnelConfig.isProbe(configJson)) {
+                    Cucore.measureOutboundDelay(configJson, target)
+                } else {
+                    Cucore.measureXrayOutboundDelay(configJson, target)
+                }
+            }
         } catch (e: Exception) {
             log(Log.WARN, "measureOutboundDelay failed", e)
             return -1L

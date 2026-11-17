@@ -19,6 +19,7 @@ enum class ProfileType {
     /** Not a server: a routing balancer over the subscription's other profiles. */
     BALANCER,
     HTTP,
+    NAIVE,
 }
 
 /**

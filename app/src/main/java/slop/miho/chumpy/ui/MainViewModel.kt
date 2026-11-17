@@ -785,9 +785,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             .profilesOf(resolvedProfile.subscriptionId)
                             .first()
                         val resolved = rows.filter {
-                            it.type != ProfileType.BALANCER && it.linkKey in keys
+                            it.type != ProfileType.BALANCER && it.type != ProfileType.NAIVE && it.linkKey in keys
                         }
-                        resolved.ifEmpty { rows.filter { it.type != ProfileType.BALANCER } }
+                        resolved.ifEmpty { rows.filter { it.type != ProfileType.BALANCER && it.type != ProfileType.NAIVE } }
                     } else {
                         emptyList()
                     }

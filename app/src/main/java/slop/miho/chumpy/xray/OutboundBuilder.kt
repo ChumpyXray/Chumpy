@@ -45,6 +45,7 @@ object OutboundBuilder {
         ProfileType.HTTP -> "http"
         ProfileType.WIREGUARD -> "wireguard"
         ProfileType.HYSTERIA2 -> "hysteria"
+        ProfileType.NAIVE -> error("NaiveProxy requires sing-box")
         // A balancer never reaches an outbound: it is unwrapped into its members at
         // build time, in XrayConfigBuilder.
         ProfileType.BALANCER -> error("a balancer is not an outbound")
@@ -52,6 +53,7 @@ object OutboundBuilder {
 
     private fun settings(profile: ProfileEntity): JsonObject = buildJsonObject {
         when (profile.type) {
+            ProfileType.NAIVE -> error("NaiveProxy requires sing-box")
             ProfileType.BALANCER -> error("a balancer is not an outbound")
 
             ProfileType.VMESS -> {
