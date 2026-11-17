@@ -84,11 +84,7 @@ object HappSpoof {
      * Chumpy and its build version, and ends with the existing client identifier.
      */
     fun headers(fingerprint: Fingerprint): Map<String, String> = mapOf(
-        "User-Agent" to if (fingerprint.incy) {
-            "INCY/${fingerprint.appVersion}/${fingerprint.os}"
-        } else {
-            "Happ/${fingerprint.appVersion}/${fingerprint.os}/Chumpy/${BuildConfig.VERSION_NAME}/${fingerprint.userId}"
-        },
+        "User-Agent" to "${if (fingerprint.incy) "INCY" else "Happ"}/${fingerprint.appVersion}/${fingerprint.os}/Chumpy/${BuildConfig.VERSION_NAME}/${fingerprint.userId}",
         "x-device-locale" to fingerprint.locale,
         "x-hwid" to fingerprint.hwid,
         "x-device-os" to fingerprint.os,
