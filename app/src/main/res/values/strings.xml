@@ -190,7 +190,7 @@
         <item quantity="one">Auto-updates %d subscription</item>
         <item quantity="other">Auto-updates %d subscriptions</item>
     </plurals>
-    <string name="settings_about_core">Xray core</string>
+    <string name="settings_about_core">Core</string>
     <string name="settings_about_core_running">running</string>
     <string name="settings_about_core_not_running">stopped</string>
     <string name="settings_about_version">Version</string>

@@ -192,7 +192,7 @@
         <item quantity="many">Автообновление %d подписок</item>
         <item quantity="other">Автообновление %d подписки</item>
     </plurals>
-    <string name="settings_about_core">Ядро Xray</string>
+    <string name="settings_about_core">Ядро</string>
     <string name="settings_about_core_running">работает</string>
     <string name="settings_about_core_not_running">остановлено</string>
     <string name="settings_about_version">Версия</string>
