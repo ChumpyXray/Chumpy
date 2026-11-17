@@ -1095,7 +1095,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 val profiles = (targets.filter { it.type != ProfileType.BALANCER } + balancers.values.flatten())
                     .distinctBy { it.id }
-                val parallelism = if (profiles.size > LARGE_PING_LIST_THRESHOLD) {
+                val parallelism = if (allRows.count { it.type != ProfileType.BALANCER } > LARGE_PING_LIST_THRESHOLD) {
                     TunnelClient.MAX_PARALLEL_DELAY_TESTS
                 } else {
                     REGULAR_PING_CONCURRENCY
