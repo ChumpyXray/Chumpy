@@ -288,6 +288,9 @@ object XrayConfigBuilder {
                             // the plain tag itself — so the one selector covers them all.
                             put("selector", buildJsonArray { add(JsonPrimitive(PROXY_TAG)) })
                             put("strategy", buildJsonObject { put("type", strategy) })
+                            if (strategy.lowercase() in OBSERVING_STRATEGIES) {
+                                put("fallbackTag", PROXY_TAG)
+                            }
                         },
                     )
                 },
