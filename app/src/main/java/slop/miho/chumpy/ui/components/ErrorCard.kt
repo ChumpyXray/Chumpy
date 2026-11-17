@@ -47,7 +47,7 @@ import slop.miho.chumpy.ui.wallpapers.withSurfaceOpacity
  * and the space around the icon reads even; wrapped messages keep the regular size.
  */
 @Composable
-fun ErrorCard(message: String, modifier: Modifier = Modifier) {
+fun ErrorCard(message: String, modifier: Modifier = Modifier, supporting: String? = null) {
     val colors = MaterialTheme.colorScheme
     var singleLine by remember { mutableStateOf(false) }
     val tileSize = if (singleLine) 32.dp else 40.dp
@@ -66,6 +66,9 @@ fun ErrorCard(message: String, modifier: Modifier = Modifier) {
                     onTextLayout = { layout -> singleLine = layout.lineCount <= 1 },
                 )
             },
+            supportingContent = if (supporting != null) {
+                { Text(supporting, color = colors.onErrorContainer) }
+            } else null,
             leadingContent = {
                 Box(
                     modifier = Modifier.size(tileSize),

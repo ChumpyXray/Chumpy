@@ -29,6 +29,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -54,6 +55,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -93,6 +95,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -209,10 +212,10 @@ fun FloatingBottomBar(
     selectedCategory: SettingsCategory,
     onCategorySelected: (SettingsCategory) -> Unit,
     backdrop: GraphicsLayer?,
+    modifier: Modifier = Modifier,
     /** Where the controller's summons land on the bar's two faces: the picked pill of each. */
     tabFocusRequester: FocusRequester? = null,
     categoryFocusRequester: FocusRequester? = null,
-    modifier: Modifier = Modifier,
 ) {
     val motion = MaterialTheme.motionScheme
     // The classic bar stands in for the pills when picked (or, unpicked, on small screens);
@@ -318,79 +321,85 @@ private fun FloatingMainBar(
     categoryFocusRequester: FocusRequester?,
 ) {
     val motion = MaterialTheme.motionScheme
-    Row(
-        modifier = Modifier
-            .navigationBarsPadding()
-            .padding(horizontal = floatingBarMargin(), vertical = BarVerticalPadding)
-            // The bar's whole footprint — the gaps between the pills included — belongs to
-            // the bar: a press there is consumed here instead of falling through to the
-            // page beneath. The pills still win their own touches: children see the events
-            // first, so this only eats what lands on the empty stretches — and the eating
-            // itself runs in the final pass, after everyone's main-pass handling, so no
-            // device's particular event stream can find a tap half-processed here.
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Final)
-                        event.changes.forEach { it.consume() }
-                        if (event.changes.none { it.pressed }) break
+    BoxWithConstraints {
+        val labelBudget = (maxWidth - floatingBarMargin() * 2 - BarHeight - 12.dp -
+            (BarHeight - ItemHeight) - ItemHeight * 3 - 8.dp).coerceAtLeast(0.dp)
+        Row(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(horizontal = floatingBarMargin(), vertical = BarVerticalPadding)
+                // The bar's whole footprint — the gaps between the pills included — belongs to
+                // the bar: a press there is consumed here instead of falling through to the
+                // page beneath. The pills still win their own touches: children see the events
+                // first, so this only eats what lands on the empty stretches — and the eating
+                // itself runs in the final pass, after everyone's main-pass handling, so no
+                // device's particular event stream can find a tap half-processed here.
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Final)
+                            event.changes.forEach { it.consume() }
+                            if (event.changes.none { it.pressed }) break
+                        }
                     }
-                }
-            },
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BarSurface(backdrop = backdrop) {
-            AnimatedContent(
-                targetState = settingsOpen,
-                transitionSpec = { morph(motion) },
-                contentAlignment = Alignment.CenterStart,
-                label = "tabs <-> back",
-            ) { open ->
-                if (open) {
-                    RoundBarButton(
-                        icon = R.drawable.ic_arrow_back,
-                        contentDescription = stringResource(R.string.nav_back),
-                        onClick = { onSettingsOpenChange(false) },
-                    )
-                } else {
-                    // The tabs face's own requester: the morph dissolves the face that
-                    // leaves, so a summon landing here always takes the row that holds.
-                    PillItems(
-                        MainTab.entries,
-                        selectedTab,
-                        onTabSelected,
-                        focusRequester = tabFocusRequester,
-                    )
+                },
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BarSurface(backdrop = backdrop) {
+                AnimatedContent(
+                    targetState = settingsOpen,
+                    transitionSpec = { morph(motion) },
+                    contentAlignment = Alignment.CenterStart,
+                    label = "tabs <-> back",
+                ) { open ->
+                    if (open) {
+                        RoundBarButton(
+                            icon = R.drawable.ic_arrow_back,
+                            contentDescription = stringResource(R.string.nav_back),
+                            onClick = { onSettingsOpenChange(false) },
+                        )
+                    } else {
+                        // The tabs face's own requester: the morph dissolves the face that
+                        // leaves, so a summon landing here always takes the row that holds.
+                        PillItems(
+                            MainTab.entries,
+                            selectedTab,
+                            onTabSelected,
+                            focusRequester = tabFocusRequester,
+                            labelBudget = labelBudget,
+                        )
+                    }
                 }
             }
-        }
-        BarSurface(backdrop = backdrop) {
-            AnimatedContent(
-                targetState = settingsOpen,
-                transitionSpec = { morph(motion) },
-                contentAlignment = Alignment.CenterStart,
-                label = "settings <-> categories",
-            ) { open ->
-                if (open) {
-                    // The categories face's own requester, the tabs' mirror (see above).
-                    PillItems(
-                        SettingsCategory.entries,
-                        selectedCategory,
-                        onCategorySelected,
-                        focusRequester = categoryFocusRequester,
-                    )
-                } else {
-                    // The gear spins away as it unfolds into the category pill.
-                    val rotation by transition.animateFloat(label = "gear rotation") { state ->
-                        if (state == EnterExitState.Visible) 0f else 120f
+            BarSurface(backdrop = backdrop) {
+                AnimatedContent(
+                    targetState = settingsOpen,
+                    transitionSpec = { morph(motion) },
+                    contentAlignment = Alignment.CenterStart,
+                    label = "settings <-> categories",
+                ) { open ->
+                    if (open) {
+                        // The categories face's own requester, the tabs' mirror (see above).
+                        PillItems(
+                            SettingsCategory.entries,
+                            selectedCategory,
+                            onCategorySelected,
+                            focusRequester = categoryFocusRequester,
+                            labelBudget = labelBudget,
+                        )
+                    } else {
+                        // The gear spins away as it unfolds into the category pill.
+                        val rotation by transition.animateFloat(label = "gear rotation") { state ->
+                            if (state == EnterExitState.Visible) 0f else 120f
+                        }
+                        RoundBarButton(
+                            icon = R.drawable.ic_settings,
+                            contentDescription = stringResource(R.string.nav_settings),
+                            onClick = { onSettingsOpenChange(true) },
+                            iconModifier = Modifier.graphicsLayer { rotationZ = rotation },
+                        )
                     }
-                    RoundBarButton(
-                        icon = R.drawable.ic_settings,
-                        contentDescription = stringResource(R.string.nav_settings),
-                        onClick = { onSettingsOpenChange(true) },
-                        iconModifier = Modifier.graphicsLayer { rotationZ = rotation },
-                    )
                 }
             }
         }
@@ -639,8 +648,8 @@ private fun AnimatedContentTransitionScope<Boolean>.morph(motion: MotionScheme):
 @Composable
 private fun BarSurface(
     backdrop: GraphicsLayer?,
-    floating: Boolean = true,
     modifier: Modifier = Modifier,
+    floating: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val barShape = if (floating) CircleShape else RectangleShape
@@ -715,8 +724,8 @@ private fun BarSurface(
     // The gradient's reach past the bar's own bounds, in the root's terms: how far the
     // window stretches to the left and the right of the surface. The classic bar's paint
     // reads these alone — see the overreach below.
-    var gradientLeft by remember { mutableStateOf(0f) }
-    var gradientRight by remember { mutableStateOf(0f) }
+    var gradientLeft by remember { mutableFloatStateOf(0f) }
+    var gradientRight by remember { mutableFloatStateOf(0f) }
     // The tint the pills inside should wear: the glass's density while the frost is up, the
     // plain surface opacity while it's down, blended through the frost's own fade so the
     // selection indicator never pops. Handed down as readers, for the pills' draw blocks.
@@ -919,6 +928,7 @@ private fun RoundBarButton(
     icon: Int,
     contentDescription: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
     iconModifier: Modifier = Modifier,
 ) {
     // No press ripple: the morph into the other shape is already the button's whole
@@ -926,7 +936,7 @@ private fun RoundBarButton(
     val interactionSource = remember { MutableInteractionSource() }
     val tap = greedyTap(onClick)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(BarHeight)
             // The ring rides inset: the bar's frost surface clips its content to its
             // own circle, and a ring drawn past the button's edge would be cut down
@@ -961,7 +971,17 @@ private fun <T : PillDestination> PillItems(
     onSelect: (T) -> Unit,
     /** The face's own landing for the controller's summons, taken by the picked pill. */
     focusRequester: FocusRequester? = null,
+    labelBudget: Dp = Dp.Infinity,
 ) {
+    val motion = MaterialTheme.motionScheme
+    val reveals = items.map { item ->
+        animateFloatAsState(
+            targetValue = if (item == selected) 1f else 0f,
+            animationSpec = motion.defaultSpatialSpec(),
+            label = "tab label reveal",
+        ).value.coerceIn(0f, 1f)
+    }
+    val labelMaxWidth = labelBudget / reveals.sum().coerceAtLeast(1f)
     Row(
         modifier = Modifier
             .padding((BarHeight - ItemHeight) / 2)
@@ -969,12 +989,14 @@ private fun <T : PillDestination> PillItems(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        items.forEach { item ->
+        items.forEachIndexed { index, item ->
             PillItem(
                 icon = item.icon,
                 filledIcon = item.filledIcon,
                 label = stringResource(item.label),
                 selected = item == selected,
+                labelReveal = reveals[index],
+                labelMaxWidth = labelMaxWidth,
                 onClick = { onSelect(item) },
                 focusRequester = if (item == selected) focusRequester else null,
             )
@@ -989,6 +1011,8 @@ private fun PillItem(
     filledIcon: Int = icon,
     label: String,
     selected: Boolean,
+    labelReveal: Float,
+    labelMaxWidth: Dp,
     onClick: () -> Unit,
     /** Where the BACK-summon lands, on the picked pill alone. */
     focusRequester: FocusRequester? = null,
@@ -1011,16 +1035,6 @@ private fun PillItem(
         targetValue = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
         animationSpec = motion.defaultEffectsSpec(),
         label = "item content",
-    )
-    // The label unfolds with the selection and folds without it. Its window is clipped
-    // rather than re-constrained: an animating width constraint would re-measure the text
-    // every frame — re-wrapping, re-eliding, flickering for the moment the previous page's
-    // label collapsed. Measured once at its full size, the text just slides behind the
-    // window's edge.
-    val labelReveal by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
-        animationSpec = motion.defaultSpatialSpec(),
-        label = "tab label reveal",
     )
     val tap = greedyTap(onClick)
     Row(
@@ -1078,7 +1092,8 @@ private fun PillItem(
                 .graphicsLayer { alpha = labelReveal.coerceIn(0f, 1f) }
                 .clipToBounds()
                 .layout { measurable, _ ->
-                    val placeable = measurable.measure(Constraints())
+                    val limit = if (labelMaxWidth == Dp.Infinity) Constraints.Infinity else labelMaxWidth.roundToPx()
+                    val placeable = measurable.measure(Constraints(maxWidth = limit))
                     // The spring overshoots past zero on the way out; clamped, the window
                     // would report a negative width for a frame and crash the measure.
                     val width = (placeable.width * labelReveal)
@@ -1092,6 +1107,8 @@ private fun PillItem(
                 color = content,
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(start = 8.dp, end = 4.dp),
             )
         }

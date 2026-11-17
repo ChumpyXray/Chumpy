@@ -19,6 +19,7 @@ import slop.miho.chumpy.ui.components.LocalInputMode
 import slop.miho.chumpy.ui.components.InputMode
 import slop.miho.chumpy.ui.components.controllerScrollFallback
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -347,68 +348,50 @@ private fun TrafficChart(samples: List<TrafficSample>, modifier: Modifier = Modi
     val colors = MaterialTheme.colorScheme
     val grid = colors.outlineVariant.copy(alpha = 0.45f)
     val minuteGrid = colors.outlineVariant.copy(alpha = 0.22f)
-    Canvas(modifier = modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().drawWithCache {
         val chartW = size.width
         val chartH = size.height
         val xMax = samples.last().atMillis + BUCKET_MILLIS / 2
         val xMin = xMax - STATS_WINDOW_MILLIS
         val span = (xMax - xMin).coerceAtLeast(1L)
-        val maxRate = maxOf(
-            samples.maxOf { it.downBps },
-            samples.maxOf { it.upBps },
-        )
+        val maxRate = maxOf(samples.maxOf { it.downBps }, samples.maxOf { it.upBps })
         val scale = niceCeil(maxRate * 1.15).coerceAtLeast(1.0)
-        // A bucket's point sits at its midpoint: the average speaks for the whole span.
         fun x(at: Long) = chartW * (at + BUCKET_MILLIS / 2 - xMin) / span
         fun y(rate: Long) = (chartH * (1.0 - rate / scale)).toFloat()
 
-        // The quiet grid: a line at the top, middle and baseline, and a fainter one every
-        // five minutes of the window sliding in from the right edge.
-        for (i in 0..2) {
-            val gy = chartH * i / 2f
-            drawLine(grid, Offset(0f, gy), Offset(chartW, gy), strokeWidth = 1.dp.toPx())
-        }
         val gridStepMillis = 5 * 60_000L
         val firstGrid = (xMin / gridStepMillis + 1) * gridStepMillis
-        for (gridTime in firstGrid..xMax step gridStepMillis) {
-            val mx = x(gridTime)
-            drawLine(
-                minuteGrid,
-                Offset(mx, 0f),
-                Offset(mx, chartH),
-                strokeWidth = 1.dp.toPx(),
-            )
-        }
-
+        val verticalGrid = (firstGrid..xMax step gridStepMillis).map(::x)
         val downPoints = samples.map { Offset(x(it.atMillis), y(it.downBps)) }
         val upPoints = samples.map { Offset(x(it.atMillis), y(it.upBps)) }
-
-        // Download's fill, fading toward the baseline.
+        val downLine = Path().apply { smoothThrough(downPoints) }
+        val upLine = Path().apply { smoothThrough(upPoints) }
         val fill = Path().apply {
-            smoothThrough(downPoints)
+            addPath(downLine)
             lineTo(downPoints.last().x, chartH)
             lineTo(downPoints.first().x, chartH)
             close()
         }
-        drawPath(
-            fill,
-            Brush.verticalGradient(
-                0f to colors.primary.copy(alpha = 0.28f),
-                1f to colors.primary.copy(alpha = 0.04f),
-            ),
+        val fillBrush = Brush.verticalGradient(
+            0f to colors.primary.copy(alpha = 0.28f),
+            1f to colors.primary.copy(alpha = 0.04f),
         )
-        // The lines themselves.
-        drawPath(
-            Path().apply { smoothThrough(downPoints) },
-            colors.primary,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()),
-        )
-        drawPath(
-            Path().apply { smoothThrough(upPoints) },
-            colors.tertiary,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()),
-        )
-    }
+        val gridWidth = 1.dp.toPx()
+        val lineStroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+
+        onDrawBehind {
+            for (i in 0..2) {
+                val gy = chartH * i / 2f
+                drawLine(grid, Offset(0f, gy), Offset(chartW, gy), strokeWidth = gridWidth)
+            }
+            for (mx in verticalGrid) {
+                drawLine(minuteGrid, Offset(mx, 0f), Offset(mx, chartH), strokeWidth = gridWidth)
+            }
+            drawPath(fill, fillBrush)
+            drawPath(downLine, colors.primary, style = lineStroke)
+            drawPath(upLine, colors.tertiary, style = lineStroke)
+        }
+    })
 }
 
 /**

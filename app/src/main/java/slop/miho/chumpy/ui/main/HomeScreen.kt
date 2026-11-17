@@ -119,6 +119,7 @@ internal val LocalHomeBarFocusRequester = androidx.compose.runtime.staticComposi
 fun HomeScreen(
     status: TunnelStatus,
     home: HomeUiState,
+    modifier: Modifier = Modifier,
     /** Whether the page is the one on screen; coming into view re-measures the ping. */
     visible: Boolean = true,
     /** Re-measures the ping now; `true` blanks the old value while the new one is on its way. */
@@ -134,7 +135,6 @@ fun HomeScreen(
     onUpdateChipTap: () -> Unit = {},
     /** The update chip's long press: wave this version away until something newer lands. */
     onHideUpdate: () -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
     val up = status.state == TunnelState.UP
 
@@ -241,10 +241,7 @@ fun HomeScreen(
                 // A failed connect takes over the server card's slot, with the same appear
                 // motion; it leaves again as soon as the next attempt clears the error.
                 TunnelAppear(visible = status.error != null) {
-                    ErrorCard(
-                        message = status.error.orEmpty(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    status.error?.let { TunnelErrorCard(it) }
                 }
                 home.profileLabel?.let { title ->
                     // The server card is always there, connected or not: the picked
@@ -395,6 +392,22 @@ private fun InfoChips(
 
 /** The server card fades and slides in with the MD3 motion scheme when the tunnel
  *  comes up, and shrinks away when it goes down. */
+@Composable
+private fun TunnelErrorCard(rawError: String) {
+    val knownMessage = when (rawError) {
+        stringResource(R.string.error_no_config),
+        stringResource(R.string.error_vpn_not_authorized),
+        stringResource(R.string.error_tun_creation) -> rawError
+        else -> null
+    }
+    val summary = remember(rawError) { tunnelErrorSummary(rawError) }
+    ErrorCard(
+        message = knownMessage ?: stringResource(summary),
+        supporting = stringResource(R.string.tunnel_error_see_logs),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
 @Composable
 private fun TunnelAppear(visible: Boolean, content: @Composable () -> Unit) {
     val motion = MaterialTheme.motionScheme

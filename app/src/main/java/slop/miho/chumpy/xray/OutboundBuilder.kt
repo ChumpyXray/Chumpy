@@ -42,6 +42,7 @@ object OutboundBuilder {
         ProfileType.TROJAN -> "trojan"
         ProfileType.SHADOWSOCKS -> "shadowsocks"
         ProfileType.SOCKS -> "socks"
+        ProfileType.HTTP -> "http"
         ProfileType.WIREGUARD -> "wireguard"
         ProfileType.HYSTERIA2 -> "hysteria"
         // A balancer never reaches an outbound: it is unwrapped into its members at
@@ -86,7 +87,7 @@ object OutboundBuilder {
                 put("level", 8)
             }
 
-            ProfileType.SOCKS -> {
+            ProfileType.SOCKS, ProfileType.HTTP -> {
                 put("address", host(profile))
                 put("port", profile.serverPort)
                 if (profile.username.isNotEmpty()) put("user", profile.username)
@@ -183,6 +184,15 @@ object OutboundBuilder {
     private fun tlsSettings(profile: ProfileEntity): JsonObject = buildJsonObject {
         if (profile.sni.isNotEmpty()) put("serverName", profile.sni)
         if (profile.allowInsecure) put("allowInsecure", true)
+        profile.tlsTrustCertificate?.let { certificate ->
+            put("disableSystemRoot", true)
+            put("certificates", buildJsonArray {
+                add(buildJsonObject {
+                    put("usage", "verify")
+                    put("certificate", JsonArray(certificate.lines().map(::JsonPrimitive)))
+                })
+            })
+        }
         if (profile.fingerprint.isNotEmpty()) put("fingerprint", profile.fingerprint)
         // Hysteria2 rides on HTTP/3; everything else keeps the link's own list.
         val alpn = profile.alpn.split(',').map { it.trim() }.filter { it.isNotEmpty() }
@@ -287,8 +297,17 @@ object OutboundBuilder {
                 )
             }
         }
-        if (udp.isEmpty()) return null
-        return buildJsonObject { put("udp", udp) }
+        val up = profile.hysteriaUpMbps
+        val down = profile.hysteriaDownMbps
+        if (udp.isEmpty() && up == null && down == null) return null
+        return buildJsonObject {
+            if (udp.isNotEmpty()) put("udp", udp)
+            if (up != null || down != null) put("quicParams", buildJsonObject {
+                put("congestion", "brutal")
+                up?.let { put("brutalUp", "$it mbps") }
+                down?.let { put("brutalDown", "$it mbps") }
+            })
+        }
     }
 
     /** Pass-through of a raw JSON blob (XHTTP extra); null when it is not valid JSON. */

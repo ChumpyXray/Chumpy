@@ -13,7 +13,12 @@ import slop.miho.chumpy.db.computeLinkKey
  * use. Null means "not this dialect".
  */
 object ClashYamlParser {
-    private val PROXIES_KEY = Regex("(?m)^proxies:")
+    private val PROXIES_KEY = Regex("""(?m)^[ \t]*(?:proxies|"proxies"|'proxies')[ \t]*:""")
+
+    private val httpFields = setOf(
+        "name", "type", "server", "port", "username", "password", "headers",
+        "tls", "sni", "servername", "skip-cert-verify", "alpn",
+    )
 
     /** The profiles found in the `proxies:` list, deduplicated; null when it is not one. */
     fun parse(body: String): List<ProfileEntity>? {
@@ -31,12 +36,13 @@ object ClashYamlParser {
 
     /** One clash proxy map as a profile draft; null when its endpoint does not hold together. */
     private fun proxyToProfile(proxy: Map<*, *>): ProfileEntity? {
-        val type = when (proxy["type"]) {
+        val type = when ((proxy["type"] as? String)?.lowercase()) {
             "vless" -> ProfileType.VLESS
             "vmess" -> ProfileType.VMESS
             "trojan" -> ProfileType.TROJAN
             "ss", "shadowsocks" -> ProfileType.SHADOWSOCKS
             "socks5", "socks" -> ProfileType.SOCKS
+            "http" -> ProfileType.HTTP
             "hysteria2", "hy2" -> ProfileType.HYSTERIA2
             else -> return null
         }
@@ -70,7 +76,7 @@ object ClashYamlParser {
                 password = (proxy["password"] as? String).orEmpty(),
             )
 
-            ProfileType.SOCKS -> profile = profile.copy(
+            ProfileType.SOCKS, ProfileType.HTTP -> profile = profile.copy(
                 username = (proxy["username"] as? String).orEmpty(),
                 password = (proxy["password"] as? String).orEmpty(),
             )
@@ -85,23 +91,42 @@ object ClashYamlParser {
             else -> return null
         }
 
+        when (type) {
+            ProfileType.VLESS, ProfileType.VMESS, ProfileType.TROJAN, ProfileType.HYSTERIA2 ->
+                if (profile.password.isBlank()) return null
+            ProfileType.SHADOWSOCKS ->
+                if (profile.method.isBlank() || profile.password.isEmpty()) return null
+            else -> Unit
+        }
+
+        if (type == ProfileType.HTTP) {
+            val headers = proxy["headers"]
+            if (headers != null && headers != "" && headers != "{}" && headers != emptyMap<Any, Any>()) return null
+            if (proxy.keys.any { it !in httpFields }) return null
+            val tls = (proxy["tls"] as? String)?.lowercase()
+            if (proxy["tls"] != null && tls !in setOf("true", "false")) return null
+            val skipVerification = (proxy["skip-cert-verify"] as? String)?.lowercase()
+            if (proxy["skip-cert-verify"] != null && skipVerification != "false") return null
+            if (profile.username.isEmpty() && profile.password.isNotEmpty()) return null
+        }
         val reality = proxy["reality-opts"] as? Map<*, *>
         var result = profile.copy(
             network = if (type == ProfileType.HYSTERIA2) "hysteria" else when (val net = proxy["network"] as? String) {
                 "ws", "websocket", "grpc", "httpupgrade", "kcp", "mkcp" -> net
                 "h2", "http" -> "http"
-                else -> "tcp"
+                null, "", "tcp" -> "tcp"
+                else -> return null
             },
             security = when {
                 reality != null -> "reality"
                 type == ProfileType.HYSTERIA2 || type == ProfileType.TROJAN -> "tls"
-                proxy["tls"] == "true" -> "tls"
+                (proxy["tls"] as? String).equals("true", ignoreCase = true) -> "tls"
                 else -> ""
             },
             sni = (proxy["servername"] as? String) ?: (proxy["sni"] as? String) ?: "",
             fingerprint = (proxy["client-fingerprint"] as? String).orEmpty(),
             alpn = (proxy["alpn"] as? List<*>)?.joinToString(",") { it.toString() } ?: "",
-            allowInsecure = proxy["skip-cert-verify"] == "true",
+            allowInsecure = (proxy["skip-cert-verify"] as? String).equals("true", ignoreCase = true),
             publicKey = (reality?.get("public-key") as? String).orEmpty(),
             shortId = (reality?.get("short-id") as? String).orEmpty(),
         )
