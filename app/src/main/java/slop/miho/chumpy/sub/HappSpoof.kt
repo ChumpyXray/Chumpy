@@ -19,7 +19,8 @@ import java.util.Locale
  */
 object HappSpoof {
     /** The Happ version the spoof claims; pinned, like a real client's would be. */
-    const val DEFAULT_APP_VERSION = "3.21.1"
+    const val DEFAULT_APP_VERSION = "4.11.2"
+    const val DEFAULT_INCY_APP_VERSION = "4.0.1"
 
     private const val DEFAULT_OS = "Android"
     private const val DEFAULT_LOCALE = "en"
@@ -67,7 +68,7 @@ object HappSpoof {
     fun UiSettings.happFingerprint(): Fingerprint? {
         if (!happSpoof) return null
         return Fingerprint(
-            appVersion = if (incySpoof) incyAppVersion.ifBlank { "1.0" } else happAppVersion.ifBlank { DEFAULT_APP_VERSION },
+            appVersion = if (incySpoof) incyAppVersion.ifBlank { DEFAULT_INCY_APP_VERSION } else happAppVersion.ifBlank { DEFAULT_APP_VERSION },
             incy = incySpoof,
             os = happOs.ifBlank { DEFAULT_OS },
             osVersion = happOsVersion.ifBlank { defaultOsVersion() },

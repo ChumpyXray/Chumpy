@@ -128,7 +128,7 @@ data class UiSettings(
     val happSpoof: Boolean = true,
     val happAppVersion: String = "",
     val incySpoof: Boolean = false,
-    val incyAppVersion: String = "1.0",
+    val incyAppVersion: String = HappSpoof.DEFAULT_INCY_APP_VERSION,
     val happOs: String = "",
     val happOsVersion: String = "",
     val happDeviceModel: String = "",
@@ -308,9 +308,10 @@ object SettingsStore {
             notificationsPermissionAsked = prefs.getBoolean(KEY_NOTIFICATIONS_ASKED, false),
             happSpoof = prefs.getBoolean(KEY_HAPP_SPOOF, true),
             incySpoof = prefs.getBoolean("incy_spoof", false),
-            incyAppVersion = prefs.getString("incy_app_version", "1.0").orEmpty().ifBlank { "1.0" },
+            incyAppVersion = prefs.getString("incy_app_version", null).orEmpty()
+                .let { if (it.isBlank() || it == "1.0") HappSpoof.DEFAULT_INCY_APP_VERSION else it },
             happAppVersion = prefs.getString(KEY_HAPP_APP_VERSION, null).orEmpty()
-                .ifBlank { HappSpoof.DEFAULT_APP_VERSION },
+                .let { if (it.isBlank() || it == "3.21.1") HappSpoof.DEFAULT_APP_VERSION else it },
             happOs = prefs.getString(KEY_HAPP_OS, null).orEmpty().ifBlank { "Android" },
             happOsVersion = prefs.getString(KEY_HAPP_OS_VERSION, null).orEmpty()
                 .ifBlank { HappSpoof.defaultOsVersion() },
