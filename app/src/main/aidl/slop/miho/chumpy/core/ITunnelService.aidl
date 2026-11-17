@@ -19,7 +19,7 @@ interface ITunnelService {
 
     /**
      * Measures the real delay through the given complete Xray config (one tested outbound,
-     * no inbounds) in the core process. The callback receives -1 on failure.
+     * no inbounds) in the separate probe process. The callback receives -1 on failure.
      */
     void measureDelay(String configJson, String testUrl, IDelayResult result);
 

@@ -39,6 +39,7 @@ object XrayCore {
     private var logChars = 0
 
     private lateinit var appContext: Context
+    private var assetDirectory = ASSET_DIR
 
     /** The core's own worker: init, start/stop loop and stats queries queue here. */
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "xray-worker") }
@@ -124,9 +125,10 @@ object XrayCore {
      * Idempotent, safe from any process start path. The UI process never calls it: it is
      * invoked from [ChumpyVpnService] and the app's ":core" fork in [slop.miho.chumpy.ChumpyApp].
      */
-    fun init(context: Context) {
+    fun init(context: Context, probeOnly: Boolean = false) {
         if (::appContext.isInitialized) return
         appContext = context.applicationContext
+        if (probeOnly) assetDirectory = "xray_probe_assets"
         try {
             Seq.setContext(appContext)
         } catch (e: Exception) {
@@ -171,7 +173,7 @@ object XrayCore {
         }
     }
 
-    private fun assetsDir(): File = File(appContext.filesDir, ASSET_DIR)
+    private fun assetsDir(): File = File(appContext.filesDir, assetDirectory)
 
     private fun deviceId(): String {
         val prefs = appContext.getSharedPreferences("xray_identity", Context.MODE_PRIVATE)
