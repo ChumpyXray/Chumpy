@@ -275,7 +275,7 @@ object XrayCore {
         try {
             awaitInit()
             initFailed?.let { return -1L }
-            return DelayProbe.measure(testUrl) { target -> Cucore.measureOutboundDelay(configJson, target) }
+            return DelayProbe.measure(testUrl) { target -> Cucore.measureXrayOutboundDelay(configJson, target) }
         } catch (e: Exception) {
             log(Log.WARN, "measureOutboundDelay failed", e)
             return -1L
