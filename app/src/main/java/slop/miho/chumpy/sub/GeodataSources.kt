@@ -39,7 +39,8 @@ internal object GeodataSources {
         val config = json.parseToJsonElement(decoded) as? JsonObject ?: return@runCatching ""
         val sources = linkedMapOf<String, String>()
         listOf("geoipurl" to "geoip.dat", "geositeurl" to "geosite.dat").forEach { (key, file) ->
-            config.stringIgnoreCase(key)?.let(SubscriptionHeaders::webUrl)?.let { sources[file] = it }
+            config.stringIgnoreCase(key)?.trim()?.takeIf { SubscriptionHeaders.webUrl(it) != null }
+                ?.let { sources[file] = it }
         }
         encode(sources)
     }.getOrDefault("")
