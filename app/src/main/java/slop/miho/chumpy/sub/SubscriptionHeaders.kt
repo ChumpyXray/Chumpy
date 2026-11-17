@@ -18,6 +18,7 @@ data class SubscriptionMetadata(
     val expireEpochSeconds: Long = 0,
     val updateIntervalHours: Int? = null,
     val geodataSources: String = "",
+    val routingProfileUrl: String? = null,
     /** The panel's `profile-logo`: a URL the card's avatar is downloaded from. */
     val logoUrl: String? = null,
     val supportUrl: String? = null,
@@ -28,7 +29,7 @@ data class SubscriptionMetadata(
 object SubscriptionHeaders {
     private val bodyKeys = setOf(
         "subscription-userinfo", "profile-title", "profile-update-interval",
-        "routing", "profile-logo", "support-url", "profile-web-page-url", "announce",
+        "routing", "autorouting", "profile-logo", "support-url", "profile-web-page-url", "announce",
     )
 
     internal fun bodyParameter(line: String): Pair<String, String>? {
@@ -86,7 +87,13 @@ object SubscriptionHeaders {
         first("profile-title")?.let { parseTitle(it)?.let { title -> meta = meta.copy(title = title) } }
         first("content-disposition")?.let { meta = meta.copy(title = meta.title ?: parseFilename(it)) }
         first("profile-update-interval")?.let { parseUpdateInterval(it)?.let { h -> meta = meta.copy(updateIntervalHours = h) } }
-        first("routing")?.let { meta = meta.copy(geodataSources = GeodataSources.fromHappHeader(it)) }
+        val routing = first("routing")
+        val remoteRouting = first("autorouting")?.let(GeodataSources::remoteProfileUrl)
+            ?: routing?.let(GeodataSources::remoteProfileUrl)
+        meta = meta.copy(
+            geodataSources = routing?.let(GeodataSources::fromHappHeader).orEmpty(),
+            routingProfileUrl = remoteRouting,
+        )
         first("profile-logo")?.let { meta = meta.copy(logoUrl = it) }
         return meta.copy(
             supportUrl = first("support-url")?.let(::webUrl),

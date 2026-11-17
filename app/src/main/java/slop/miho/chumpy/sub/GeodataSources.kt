@@ -14,6 +14,36 @@ internal object GeodataSources {
     private const val MAX_HAPP_HEADER_CHARS = 256 * 1024
     private const val HAPP_ONADD_PREFIX = "happ://routing/onadd/"
     private const val HAPP_ADD_PREFIX = "happ://routing/add/"
+    private val routingPrefixes = listOf(
+        HAPP_ONADD_PREFIX, HAPP_ADD_PREFIX,
+        "incy://routing/onadd/", "incy://routing/add/",
+        "://routing/onadd/", "://routing/add/",
+    )
+    private val remotePrefixes = routingPrefixes + listOf(
+        "incy://autorouting/onadd/", "incy://autorouting/add/",
+        "://autorouting/onadd/", "://autorouting/add/",
+    )
+
+    fun remoteProfileUrl(value: String): String? {
+        val trimmed = value.trim()
+        val prefix = remotePrefixes.firstOrNull { trimmed.startsWith(it, ignoreCase = true) } ?: return null
+        val payload = LinkUtils.decodeURIComponent(trimmed.substring(prefix.length))
+        return SubscriptionHeaders.webUrl(payload)
+    }
+
+    fun fromRoutingBody(body: String): String = runCatching {
+        val text = body.trim().removePrefix("\uFEFF")
+        val prefix = routingPrefixes.firstOrNull { text.startsWith(it, ignoreCase = true) }
+        val payload = if (prefix != null) LinkUtils.decodeURIComponent(text.substring(prefix.length)) else text
+        val decoded = if (payload.startsWith("{")) payload else LinkUtils.decodeBase64(payload) ?: return@runCatching ""
+        val config = json.parseToJsonElement(decoded) as? JsonObject ?: return@runCatching ""
+        val sources = linkedMapOf<String, String>()
+        listOf("geoipurl" to "geoip.dat", "geositeurl" to "geosite.dat").forEach { (key, file) ->
+            config.stringIgnoreCase(key)?.let(SubscriptionHeaders::webUrl)?.let { sources[file] = it }
+        }
+        encode(sources)
+    }.getOrDefault("")
+
 
     private val json = Json { ignoreUnknownKeys = true }
     private val filename = Regex("[A-Za-z0-9][A-Za-z0-9_.-]{0,79}\\.dat")
@@ -35,19 +65,8 @@ internal object GeodataSources {
      */
     fun fromHappHeader(header: String): String = runCatching {
         val value = header.trim()
-        val prefix = listOf(HAPP_ONADD_PREFIX, HAPP_ADD_PREFIX)
-            .firstOrNull { value.startsWith(it, ignoreCase = true) }
-            ?: return@runCatching ""
         if (value.length > MAX_HAPP_HEADER_CHARS) return@runCatching ""
-        val decoded = LinkUtils.decodeBase64(LinkUtils.decodeURIComponent(value.substring(prefix.length)))
-            ?: return@runCatching ""
-        val config = json.parseToJsonElement(decoded) as? JsonObject ?: return@runCatching ""
-        val sources = linkedMapOf<String, JsonElement>()
-        listOf("geoipurl" to "geoip.dat", "geositeurl" to "geosite.dat").forEach { (key, file) ->
-            val url = config.stringIgnoreCase(key)?.trim().orEmpty()
-            if (url.isNotEmpty()) sources[file] = JsonPrimitive(url)
-        }
-        if (sources.isEmpty()) "" else JsonObject(sources).toString()
+        fromRoutingBody(value)
     }.getOrDefault("")
 
     /** Panels spell the keys both ways, so the lookup ignores case. */

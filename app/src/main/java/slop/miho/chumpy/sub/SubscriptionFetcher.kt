@@ -74,7 +74,18 @@ class SubscriptionFetcher(
      * when the settings carry one, takes the UA and the x- headers over from the app's
      * own identity.
      */
-    suspend fun fetch(rawUrl: String): FetchResult = suspendCancellableCoroutine { continuation ->
+    suspend fun fetch(rawUrl: String): FetchResult {
+        val response = fetchResponse(rawUrl)
+        val source = response.metadata.routingProfileUrl ?: return response
+        val profile = fetchResponse(source)
+        val sources = GeodataSources.fromRoutingBody(profile.body)
+        if (sources.isEmpty()) throw IOException("Routing profile provides no geodata download URLs")
+        return response.copy(metadata = response.metadata.copy(
+            geodataSources = GeodataSources.merge(response.metadata.geodataSources, sources),
+        ))
+    }
+
+    private suspend fun fetchResponse(rawUrl: String): FetchResult = suspendCancellableCoroutine { continuation ->
         val client = if (tunnelUp()) tunnelClient else directClient
         val request = Request.Builder().url(normalizeUrl(rawUrl)).get()
         val fingerprint = happSpoof()
