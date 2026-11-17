@@ -645,6 +645,7 @@ private fun ToggleRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
     onLongClick: (() -> Unit)? = null,
+    rotateIconOnClick: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -698,6 +699,7 @@ private fun ToggleRow(
             pressed = pressed,
             taps = taps,
             focused = { rowFocused },
+            rotateOnClick = rotateIconOnClick,
         )
     }
 }
@@ -714,6 +716,7 @@ private fun ToggleIconTile(
     pressed: Boolean,
     taps: Int,
     focused: (() -> Boolean)? = null,
+    rotateOnClick: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
@@ -727,6 +730,11 @@ private fun ToggleIconTile(
         targetValue = if (checked) colors.onPrimary else colors.onSecondaryContainer,
         animationSpec = motion.defaultEffectsSpec(),
         label = "toggle tile content",
+    )
+    val rotation = animateFloatAsState(
+        targetValue = if (rotateOnClick) taps * 360f else 0f,
+        animationSpec = motion.defaultSpatialSpec(),
+        label = "toggle icon rotation",
     )
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -746,7 +754,9 @@ private fun ToggleIconTile(
                 Icon(
                     painter = painterResource(res),
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer { rotationZ = rotation.value },
                 )
             }
         }
@@ -1176,6 +1186,7 @@ fun ConnectionScreen(
                         title = stringResource(R.string.incy_spoof),
                         supporting = null,
                         icon = R.drawable.ic_settings,
+                        rotateIconOnClick = true,
                         checked = settings.incySpoof,
                         onChange = { enabled -> onChangeSettings { it.copy(incySpoof = enabled) } },
                     )
