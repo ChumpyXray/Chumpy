@@ -197,6 +197,7 @@ object XrayCore {
                 if (lastUiTrafficAt == 0L) lastUiTrafficAt = SystemClock.elapsedRealtime()
             }
             isRunning = true
+            log(Log.INFO, "VPN started (${core.engine()})")
             return null
         } catch (e: Exception) {
             isRunning = false

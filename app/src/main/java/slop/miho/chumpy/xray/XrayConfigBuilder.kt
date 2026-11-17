@@ -91,7 +91,10 @@ object XrayConfigBuilder {
         val strategy = profile.balancerStrategy.ifEmpty { "random" }
         return buildJsonObject {
             put("stats", buildJsonObject {})
-            put("log", buildJsonObject { put("loglevel", "warning") })
+            put("log", buildJsonObject {
+                put("access", "none")
+                put("loglevel", "warning")
+            })
         put(
             "policy",
             buildJsonObject {
