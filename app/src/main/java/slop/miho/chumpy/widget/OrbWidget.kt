@@ -312,9 +312,11 @@ class OrbWidget : AppWidgetProvider() {
     // ------------------------------------------------------------- the taps
 
     /**
-     * The button: up or climbing means down; down means up — the same config the last
-     * connect wrote, the QS tile's own arrangement. Busy in the other direction
-     * (disconnecting) is answered with silence, like the app's own button.
+     * The button: up or climbing means down; down means up — but never the config the
+     * last connect happened to leave behind: the rise follows the app's own pick, the
+     * selection's config written fresh before the service starts, so the tunnel comes
+     * up on the region chosen in the app. Busy in the other direction (disconnecting)
+     * is answered with silence, like the app's own button.
      */
     private suspend fun toggle(context: Context) {
         when (currentState(context)) {
@@ -322,6 +324,15 @@ class OrbWidget : AppWidgetProvider() {
             TunnelState.DISCONNECTING -> Unit
             TunnelState.DOWN ->
                 if (CoreConfigFile.has(context) && VpnService.prepare(context) == null) {
+                    // The app's own connect falls back to the first profile when
+                    // nothing stands selected; the widget answers the same way.
+                    val connection = ConnectionStore.current(context)
+                    val rows = Graph.subscriptions.profilesOf(connection.selectedSubscriptionId).first()
+                    val profile = rows.firstOrNull { it.id == connection.selectedProfileId }
+                        ?: rows.firstOrNull { !it.hidden && !it.concealed }
+                    if (profile != null && !profile.hidden && !profile.concealed) {
+                        handOffConfig(context, profile)
+                    }
                     ChumpyVpnService.startConnect(context)
                 }
         }

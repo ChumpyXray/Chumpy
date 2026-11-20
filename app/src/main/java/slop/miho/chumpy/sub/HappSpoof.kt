@@ -2,6 +2,7 @@ package slop.miho.chumpy.sub
 
 import android.os.Build
 import slop.miho.chumpy.BuildConfig
+import slop.miho.chumpy.data.SpoofMode
 import slop.miho.chumpy.data.UiSettings
 import java.net.HttpURLConnection
 import java.security.SecureRandom
@@ -66,10 +67,11 @@ object HappSpoof {
 
     /** The fingerprint a fetch carries, or null when the spoof is off in the settings. */
     fun UiSettings.happFingerprint(): Fingerprint? {
-        if (!happSpoof) return null
+        if (spoofMode == SpoofMode.OFF) return null
+        val incy = spoofMode == SpoofMode.INCY
         return Fingerprint(
-            appVersion = if (incySpoof) incyAppVersion.ifBlank { DEFAULT_INCY_APP_VERSION } else happAppVersion.ifBlank { DEFAULT_APP_VERSION },
-            incy = incySpoof,
+            appVersion = if (incy) incyAppVersion.ifBlank { DEFAULT_INCY_APP_VERSION } else happAppVersion.ifBlank { DEFAULT_APP_VERSION },
+            incy = incy,
             os = happOs.ifBlank { DEFAULT_OS },
             osVersion = happOsVersion.ifBlank { defaultOsVersion() },
             deviceModel = happDeviceModel.ifBlank { defaultDeviceModel() },

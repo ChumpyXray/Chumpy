@@ -87,8 +87,9 @@
     <string name="card_menu_yes">Да</string>
     <string name="card_menu_no">Нет</string>
 
-    <string name="happ_title">Маскировка под Happ</string>
-    <string name="happ_active">Включено</string>
+    <string name="spoof_title">Спуффер</string>
+    <string name="spoof_as_happ">Маскировка под Happ</string>
+    <string name="spoof_as_incy">Маскировка под INCY</string>
     <string name="happ_edit">Изменить данные маскировки</string>
     <string name="happ_app_version">Версия приложения</string>
     <string name="happ_os">ОС</string>
@@ -353,5 +354,4 @@
     <string name="tunnel_error_timeout">Слишком долго ждали ответа. Попробуйте снова или выберите другой сервер.</string>
     <string name="tunnel_error_stopping">VPN ещё отключается. Подождите немного и попробуйте снова.</string>
     <string name="tunnel_error_storage">На устройстве закончилось место. Освободите немного памяти и попробуйте снова.</string>
-    <string name="incy_spoof">Маскировка под INCY</string>
 </resources>
