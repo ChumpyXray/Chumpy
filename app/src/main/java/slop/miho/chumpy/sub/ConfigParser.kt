@@ -27,13 +27,19 @@ import slop.miho.chumpy.db.computeLinkKey
  * so the app round-trips its own exports too. Null means "not this dialect".
  */
 object ConfigParser {
-    private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private val lenientJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        allowComments = true
+        allowTrailingComma = true
+    }
 
     private const val TLS = "tls"
     private const val REALITY = "reality"
 
     /** The protocols that mark a real proxy outbound; everything else is plumbing. */
-    private val PROXY_PROTOCOLS = setOf("vless", "vmess", "trojan", "shadowsocks", "socks", "hysteria", "wireguard")
+    private val PROXY_PROTOCOLS = setOf("vless", "vmess", "trojan", "shadowsocks", "socks", "http", "hysteria", "wireguard")
 
     /** The strategies this core runs, normalized to the names it switches on. */
     private val STRATEGIES = setOf("random", "roundrobin", "leastping", "leastload")
@@ -55,11 +61,15 @@ object ConfigParser {
     /** The profiles found in a raw-config body, deduplicated; null when it is not one. */
     fun parse(body: String): List<ProfileEntity>? {
         val trimmed = body.trim().removePrefix("\uFEFF").trim()
-        if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null
+        if (!trimmed.startsWith("[") && !trimmed.startsWith("{") &&
+            !trimmed.startsWith("//") && !trimmed.startsWith("/*")) return null
         val root = try {
             lenientJson.parseToJsonElement(trimmed)
         } catch (_: Exception) {
             return null
+        }
+        if (root is JsonArray && root.none { it is JsonObject }) {
+            return root.strings().mapNotNull(LinkParsers::parse)
         }
         val configs = when (root) {
             is JsonArray -> root.filterIsInstance<JsonObject>().ifEmpty { return null }
@@ -67,6 +77,7 @@ object ConfigParser {
             else -> return null
         }
         if (configs.none { it.array("outbounds") != null }) return null
+        val singBoxProfiles = configs.flatMap(SingBoxOutbounds::parse)
 
         // One config's reading, tag and profile together.
         val bundles = configs.map { config ->
@@ -137,7 +148,7 @@ object ConfigParser {
                 }
             }
         }
-        return if (profiles.isEmpty()) null else profiles
+        return (profiles + singBoxProfiles).ifEmpty { null }
     }
 
     /**
@@ -214,6 +225,7 @@ object ConfigParser {
             "trojan" -> ProfileType.TROJAN
             "shadowsocks" -> ProfileType.SHADOWSOCKS
             "socks" -> ProfileType.SOCKS
+            "http" -> ProfileType.HTTP
             "hysteria" -> ProfileType.HYSTERIA2
             "wireguard" -> ProfileType.WIREGUARD
             else -> return null
@@ -236,6 +248,7 @@ object ConfigParser {
                 wgMtu = settings.int("mtu") ?: 1420,
                 wgReserved = settings.array("reserved")?.strings()?.joinToString(",").orEmpty())
         }
+        if (type == ProfileType.HTTP && !canImportHttp(outbound, settings)) return null
         // The nested dialect nests the endpoint in vnext/servers with a users list
         // inside; the flat one (our own) keeps address/port/id directly in settings.
         val endpoint = settings.array("vnext")?.arrayOfObjects()?.firstOrNull()
@@ -274,7 +287,7 @@ object ConfigParser {
                 password = endpoint?.str("password") ?: settings.str("password").orEmpty(),
             )
 
-            ProfileType.SOCKS -> profile = profile.copy(
+            ProfileType.SOCKS, ProfileType.HTTP -> profile = profile.copy(
                 username = user?.str("user") ?: settings.str("user").orEmpty(),
                 password = user?.str("pass") ?: settings.str("pass").orEmpty(),
             )
@@ -306,8 +319,28 @@ object ConfigParser {
         }
         if (type in setOf(ProfileType.VLESS, ProfileType.VMESS, ProfileType.TROJAN) && profile.password.isBlank()) return null
         if (type == ProfileType.SHADOWSOCKS && (profile.method.isBlank() || profile.password.isEmpty())) return null
+        if (type == ProfileType.HTTP && profile.username.isEmpty() && profile.password.isNotEmpty()) return null
         val streamed = withStream(profile, outbound.obj("streamSettings"))
         return if (type == ProfileType.HYSTERIA2) streamed.copy(network = "hysteria") else streamed
+    }
+
+    private fun canImportHttp(outbound: JsonObject, settings: JsonObject): Boolean {
+        if (outbound.keys.any { it !in setOf("tag", "protocol", "settings", "streamSettings") }) return false
+        val headers = settings["headers"]
+        if (headers != null && (headers !is JsonObject || headers.isNotEmpty())) return false
+        if (settings.str("address") == null) {
+            val endpoint = (settings["servers"] as? JsonArray)?.singleOrNull() as? JsonObject ?: return false
+            val users = endpoint["users"]
+            if (users != null && (users !is JsonArray || users.size > 1 || users.any { it !is JsonObject })) return false
+        } else if (settings.containsKey("servers")) return false
+        if (settings.containsKey("vnext")) return false
+        val stream = outbound["streamSettings"] ?: return true
+        if (stream !is JsonObject || stream.keys.any { it !in setOf("network", "security", "tlsSettings") }) return false
+        if (stream.str("network").orEmpty() !in setOf("", "tcp", "raw")) return false
+        if (stream.str("security").orEmpty() !in setOf("", "none", "tls")) return false
+        val tls = stream["tlsSettings"] ?: return true
+        return tls is JsonObject && tls.keys.all { it in setOf("serverName", "alpn", "fingerprint", "allowInsecure") } &&
+            (tls["allowInsecure"] == null || tls["allowInsecure"] == JsonPrimitive(false))
     }
 
     /**

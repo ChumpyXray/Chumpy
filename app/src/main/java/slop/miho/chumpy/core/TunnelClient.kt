@@ -1,11 +1,15 @@
 package slop.miho.chumpy.core
 
 import android.content.ComponentName
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.RemoteException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +19,12 @@ import kotlinx.coroutines.flow.asStateFlow
  * service commands (the VPN must be started, not merely bound); the binder carries status
  * callbacks, traffic counters and delay measurements.
  */
-class TunnelClient(private val context: Context) {
+class TunnelClient(context: Context) {
+    internal companion object {
+        const val MAX_PARALLEL_DELAY_TESTS = 25
+    }
+
+    private val context: Application = context.applicationContext as Application
     private val _status = MutableStateFlow(TunnelStatus())
     val status: StateFlow<TunnelStatus> = _status.asStateFlow()
 
@@ -96,12 +105,27 @@ class TunnelClient(private val context: Context) {
 
     /**
      * A real delay measurement through [configJson], performed by a one-off core instance
-     * in the ":core" process. Blocking — call from Dispatchers.IO. Null when unreachable.
+     * in the ":core" process. Null when unreachable.
      */
-    fun measureDelay(configJson: String, testUrl: String): Long? {
+    suspend fun measureDelay(configJson: String, testUrl: String): Long? {
         val remote = service ?: return null
+        val binder = remote.asBinder()
+        val result = CompletableDeferred<Long?>()
+        val deathRecipient = IBinder.DeathRecipient { result.complete(null) }
+        val callback = object : IDelayResult.Stub() {
+            override fun onResult(delayMillis: Long) {
+                result.complete(delayMillis.takeIf { it >= 0 })
+            }
+        }
         return try {
-            remote.measureDelay(configJson, testUrl).takeIf { it >= 0 }
+            binder.linkToDeath(deathRecipient, 0)
+            try {
+                remote.measureDelay(configJson, testUrl, callback)
+                // Keep the caller's permit until the native request actually finishes.
+                withContext(NonCancellable) { result.await() }
+            } finally {
+                binder.unlinkToDeath(deathRecipient, 0)
+            }
         } catch (_: RemoteException) {
             null
         }

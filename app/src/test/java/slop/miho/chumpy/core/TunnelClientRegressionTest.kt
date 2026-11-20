@@ -1,6 +1,7 @@
 package slop.miho.chumpy.core
 
 import android.app.Application
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -12,14 +13,16 @@ import org.robolectric.annotation.Config
 @Config(sdk = [28], application = Application::class)
 class TunnelClientRegressionTest {
     @Test
-    fun `failed native delay is reported as a lost probe`() {
+    fun `failed native delay is reported as a lost probe`() = runBlocking {
         var delay = -1L
         val remote = object : ITunnelService.Stub() {
             override fun connect() = Unit
             override fun disconnect() = Unit
             override fun connectedAtMillis() = 0L
             override fun trafficBytes() = longArrayOf(0, 0, 1)
-            override fun measureDelay(configJson: String?, testUrl: String?) = delay
+            override fun measureDelay(configJson: String?, testUrl: String?, result: IDelayResult?) {
+                result?.onResult(delay)
+            }
             override fun measureLiveDelay(testUrl: String?) = delay
             override fun coreVersion() = "test"
             override fun coreLogs() = ""

@@ -130,7 +130,6 @@
     <string name="settings_accent_rainbow">Радужный</string>
     <string name="settings_accent_custom">Свой</string>
     <string name="settings_accent_custom_title">Свой цвет</string>
-    <string name="settings_accent_custom_hex">HEX-цвет</string>
     <string name="settings_accent_custom_pick">Выбрать</string>
     <string name="settings_slow_animations">Медленные анимации</string>
     <string name="settings_slow_animations_hint">Движения становятся плавнее, слегка пружинее</string>
@@ -187,7 +186,12 @@
     <string name="connection_bypass_lan_on">Локальный трафик идёт мимо VPN, как будто его нет</string>
     <string name="connection_bypass_lan_off">Всё идёт через туннель, включая локалку</string>
     <string name="settings_background_refresh">Фоновое обновление</string>
-    <string name="settings_background_refresh_count">Автообновление подписок: %d</string>
+    <plurals name="settings_background_refresh_count">
+        <item quantity="one">Автообновление %d подписки</item>
+        <item quantity="few">Автообновление %d подписок</item>
+        <item quantity="many">Автообновление %d подписок</item>
+        <item quantity="other">Автообновление %d подписки</item>
+    </plurals>
     <string name="settings_about_core">Ядро Xray</string>
     <string name="settings_about_core_running">работает</string>
     <string name="settings_about_core_not_running">остановлено</string>
@@ -325,4 +329,27 @@
     <string name="widget_disconnect">Отключить</string>
     <string name="widget_setup">Настроить Chumpy</string>
     <string name="widget_empty">Сервера ещё нет</string>
+    <string name="per_app_search">Поиск приложений</string>
+    <string name="per_app_search_empty">Приложения не найдены</string>
+    <string name="subscription_link_title">Добавить подписку?</string>
+    <string name="local_network_permission_required">Разрешите доступ к устройствам поблизости, чтобы принимать файлы с телефона.</string>
+    <string name="subscription_support">Поддержка</string>
+    <string name="subscription_website">Сайт подписки</string>
+    <string name="server_ping_action">Проверить пинг сервера</string>
+    <string name="tunnel_error_port_busy">Локальный порт занят. Закройте другие VPN или прокси-приложения и попробуйте снова.</string>
+    <string name="tunnel_error_geodata">Не удалось загрузить базы маршрутизации. Обновите подписку и попробуйте снова.</string>
+    <string name="tunnel_error_config">Не удалось прочитать настройки сервера. Обновите подписку или выберите другой сервер.</string>
+    <string name="tunnel_error_generic">Не удалось запустить VPN. Попробуйте подключиться снова.</string>
+    <string name="tunnel_error_see_logs">См. «Статистика → Логи ядра».</string>
+    <string name="tunnel_error_protocol">Сервер использует неподдерживаемый протокол или метод шифрования. Обновите подписку или выберите другой сервер.</string>
+    <string name="tunnel_error_security">Не удалось настроить или проверить защищённое соединение. Обновите подписку или выберите другой сервер.</string>
+    <string name="tunnel_error_routing">Не удалось применить правила маршрутизации. Обновите подписку или выберите другой сервер.</string>
+    <string name="tunnel_error_dns">Не удалось настроить DNS или найти адрес сервера. Проверьте интернет и настройки DNS.</string>
+    <string name="tunnel_error_listener">Не удалось открыть локальный сетевой порт. Перезапустите Chumpy и попробуйте снова.</string>
+    <string name="tunnel_error_network">Сеть недоступна. Проверьте Wi-Fi или мобильный интернет.</string>
+    <string name="tunnel_error_connection">Соединение отклонено или прервано. Попробуйте снова или выберите другой сервер.</string>
+    <string name="tunnel_error_timeout">Слишком долго ждали ответа. Попробуйте снова или выберите другой сервер.</string>
+    <string name="tunnel_error_stopping">VPN ещё отключается. Подождите немного и попробуйте снова.</string>
+    <string name="tunnel_error_storage">На устройстве закончилось место. Освободите немного памяти и попробуйте снова.</string>
+    <string name="incy_spoof">Маскировка под INCY</string>
 </resources>

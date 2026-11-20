@@ -1,7 +1,13 @@
 package slop.miho.chumpy.ui
 
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import android.app.Application
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -10,6 +16,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -18,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -32,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -42,6 +51,7 @@ import slop.miho.chumpy.ChumpyApp
 import slop.miho.chumpy.Graph
 import slop.miho.chumpy.R
 import slop.miho.chumpy.core.CoreConfigFile
+import slop.miho.chumpy.core.TunnelClient
 import slop.miho.chumpy.core.TunnelState
 import slop.miho.chumpy.core.TunnelStatus
 import slop.miho.chumpy.core.UpdateIntents
@@ -403,7 +413,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         val target = if (app.packageManager.canRequestPackageInstalls()) install
-        else Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${app.packageName}"))
+        else Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, "package:${app.packageName}".toUri())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { app.startActivity(target) }
             .onFailure { Log.w("Chumpy/Update", "Install request failed", it) }
@@ -433,8 +443,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val connectGeneration = java.util.concurrent.atomic.AtomicInteger()
     private val configurationMutex = Mutex()
     private var sweepJob: Job? = null
-    @Volatile private var sweepGeneration = 0L
-    private val pingSemaphore = Semaphore(MAX_PING_CONCURRENCY)
+    private var sweepGeneration = 0L
+    private var pingNetworkLost = false
+    private val pingSemaphore = Semaphore(TunnelClient.MAX_PARALLEL_DELAY_TESTS)
+    private val regularPingSemaphore = Semaphore(REGULAR_PING_CONCURRENCY)
 
 
     init {
@@ -578,22 +590,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         .map { rows -> id to rows }
                         .flowOn(Dispatchers.Default)
                 }
-                .combine(connection) { (id, rows), conn -> Triple(id, rows, conn) }
-                .collect { (id, rows, conn) ->
-                    val requested = conn.selectedSubscriptionId
+                .combine(
+                    connection.map { Triple(it.selectedSubscriptionId, it.selectedProfileId, it.serversSort) }
+                        .distinctUntilChanged()
+                ) { (id, rows), selection -> Triple(id, rows, selection) }
+                .collect { (id, rows, selection) ->
+                    val (requested, selectedProfileId, sortMode) = selection
                     if (requested != null && requested != id &&
                         (requested == STANDALONE_SUBSCRIPTION_ID || subscriptions.value.any { it.id == requested })) {
                         return@collect
                     }
                     val (visible, concealed, totalServers) = withContext(Dispatchers.Default) {
-                        val sort = conn.serversSort.comparator()
+                        val sort = sortMode.comparator()
                         Triple(
                             rows.filterNot { it.hidden || it.concealed }.sortedWith(sort),
                             rows.filter { it.concealed && !it.hidden }.sortedWith(sort),
                             rows.filter { it.type != ProfileType.BALANCER }.distinctBy { it.linkKey }.size,
                         )
                     }
-                    if (visible.none { it.id == conn.selectedProfileId } && visible.isNotEmpty()) {
+                    if (visible.none { it.id == selectedProfileId } && visible.isNotEmpty()) {
                         ConnectionStore.update(app) { current ->
                             if (current.selectedSubscriptionId == requested) current.copy(selectedProfileId = visible.first().id)
                             else current
@@ -601,11 +616,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     _servers.update { state ->
                         state.copy(profiles = visible, concealed = concealed,
-                            sort = conn.serversSort, totalServers = totalServers,
+                            sort = sortMode, totalServers = totalServers,
                             selectedProfileId = visible.firstOrNull { it.id == connection.value.selectedProfileId }?.id
                                 ?: visible.firstOrNull()?.id)
                     }
-                    if (visible.any { it.type != ProfileType.BALANCER && it.lastTestAt == null }) {
+                    if (visible.any { it.lastTestAt == null }) {
                         startServerSweep(true)
                     }
                 }
@@ -614,6 +629,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         observeProfiles()
+        observePingNetwork()
         observeTunnelForHome()
         observeTunnelForStats()
         observeIdentityChips()
@@ -671,14 +687,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (lastSeen >= versionCode) return@launch
             val pending = repository.subscriptions().first()
             if (lastSeen == 0L && pending.isEmpty()) {
-                prefs.edit().putLong("version_code", versionCode).apply()
+                prefs.edit { putLong("version_code", versionCode) }
                 return@launch
             }
             var succeeded = true
             pending.forEach { subscription ->
                 if (repository.updateSubscription(subscription.id).isFailure) succeeded = false
             }
-            if (succeeded) prefs.edit().putLong("version_code", versionCode).apply()
+            if (succeeded) prefs.edit { putLong("version_code", versionCode) }
         }
     }
 
@@ -803,15 +819,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Selects a server: persists the choice and, if the tunnel is up, reloads the running
-     * core with the new profile in place — the interface stays, the session does not drop.
+     * Persists the selected server and reconnects the active VPN with its configuration.
      */
     fun selectProfile(id: String) {
-        if (_servers.value.selectedProfileId == id) return
+        val state = tunnelStatus.value.state
+        val reconnect = state == TunnelState.UP || state == TunnelState.CONNECTING
+        if (connection.value.selectedProfileId == id &&
+            (!reconnect || (state == TunnelState.UP && activeIdentity.value?.profile?.id == id))) return
         ConnectionStore.update(app) { it.copy(selectedProfileId = id) }
         // The pick is a use: the "last used" order remembers which hand the user played.
         viewModelScope.launch { repository.setProfileLastUsed(id, System.currentTimeMillis()) }
-        if (tunnelStatus.value.state in setOf(TunnelState.UP, TunnelState.CONNECTING)) {
+        if (reconnect) {
             applyConfigAndConnect(_servers.value.profiles.firstOrNull { it.id == id })
         }
     }
@@ -834,9 +852,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun addSubscription(url: String, name: String? = null, onDone: (String?) -> Unit = {}) {
         val trimmed = url.trim()
-        if (!trimmed.startsWith("http://", ignoreCase = true) &&
-            !trimmed.startsWith("https://", ignoreCase = true)
-        ) {
+        val isSubscriptionUrl = '\n' !in trimmed && '\r' !in trimmed &&
+            (trimmed.startsWith("http://", ignoreCase = true) ||
+                trimmed.startsWith("https://", ignoreCase = true))
+        if (!isSubscriptionUrl) {
             addManualProfiles(trimmed, onDone)
             return
         }
@@ -962,8 +981,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Switches the servers screen to another subscription. */
     fun selectSubscription(id: String) {
         if (selectedSubscriptionId.value == id) return
-        sweepGeneration++
-        sweepJob?.cancel()
+        cancelServerSweep()
         ConnectionStore.update(app) { it.copy(selectedSubscriptionId = id, selectedProfileId = null) }
         _servers.update { ServersUiState() }
     }
@@ -1001,51 +1019,135 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ------------------------------------------------------------ real pings
 
+    private fun observePingNetwork() {
+        val connectivity = app.getSystemService(ConnectivityManager::class.java) ?: return
+        viewModelScope.launch {
+            callbackFlow<Network?> {
+                val request = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                    .build()
+                val callback = object : ConnectivityManager.NetworkCallback() {
+                    private var upstream: Network? = null
+
+                    override fun onAvailable(network: Network) {
+                        upstream = network
+                        trySend(network)
+                    }
+
+                    override fun onLost(network: Network) {
+                        if (upstream != network) return
+                        upstream = null
+                        trySend(null)
+                    }
+                }
+                try {
+                    connectivity.requestNetwork(request, callback)
+                } catch (e: RuntimeException) {
+                    Log.w("Chumpy/Ping", "Cannot watch the underlying network", e)
+                    close()
+                    return@callbackFlow
+                }
+                awaitClose { connectivity.unregisterNetworkCallback(callback) }
+            }.distinctUntilChanged().drop(1).collect { network ->
+                pingNetworkLost = network == null
+                cancelServerSweep()
+                individualPings.values.toList().forEach { it.cancel() }
+                if (!pingNetworkLost) startServerSweep(onlyUntested = false)
+            }
+        }
+    }
+
     /**
      * A real-ping sweep over the current list, one measurement core per profile in the
      * ":core" process, a handful at a time. Pull-to-refresh on the servers screen is this;
      * every profile's chip answers with its own number — or a dash, when the server is
      * unreachable.
      */
-    fun pingServers() = startServerSweep(false)
+    fun pingServers() = startServerSweep(onlyUntested = false)
 
-    private fun startServerSweep(onlyUntested: Boolean) {
-        if (sweepJob?.isActive == true) return
-        val profiles = _servers.value.profiles.filter {
-            it.type != ProfileType.BALANCER && (!onlyUntested || it.lastTestAt == null)
+    private fun cancelServerSweep() {
+        sweepGeneration++
+        sweepJob?.cancel()
+        sweepJob = null
+        _servers.update { it.copy(isPinging = false) }
+    }
+
+    private fun startServerSweep(onlyUntested: Boolean, targetProfileId: String? = null) {
+        if (pingNetworkLost || (onlyUntested && sweepJob?.isActive == true)) return
+        val targets = _servers.value.profiles.filter {
+            (targetProfileId == null || it.id == targetProfileId) && (!onlyUntested || it.lastTestAt == null)
         }
-        if (profiles.isEmpty()) return
+        if (targets.isEmpty()) return
+        val subscriptionId = selectedSubscriptionId.value?.takeUnless { it == STANDALONE_SUBSCRIPTION_ID }
         val generation = ++sweepGeneration
+        sweepJob?.cancel()
         _servers.update { it.copy(isPinging = true) }
-        sweepJob = viewModelScope.launch(Dispatchers.IO) {
+        sweepJob = viewModelScope.launch {
             try {
                 val testUrl = connection.value.delayTestUrl
+                val allRows = repository.profilesOf(subscriptionId).first()
+                val balancers = targets.filter { it.type == ProfileType.BALANCER }
+                    .associateWith { balancer ->
+                        val keys = balancer.balancerMemberKeys.toSet()
+                        val members = allRows.filter { it.type != ProfileType.BALANCER && it.linkKey in keys }
+                        members.ifEmpty { allRows.filter { it.type != ProfileType.BALANCER } }
+                    }
+                val profiles = (targets.filter { it.type != ProfileType.BALANCER } + balancers.values.flatten())
+                    .distinctBy { it.id }
+                val parallelism = if (allRows.count { it.type != ProfileType.BALANCER } > LARGE_PING_LIST_THRESHOLD) {
+                    TunnelClient.MAX_PARALLEL_DELAY_TESTS
+                } else {
+                    REGULAR_PING_CONCURRENCY
+                }
+                val largeList = parallelism > REGULAR_PING_CONCURRENCY
+                val queue = if (onlyUntested) profiles else withContext(Dispatchers.Default) {
+                    profiles.sortedBy { profile ->
+                        when {
+                            (profile.testDelayMillis ?: -1) >= 0 -> 0
+                            profile.lastTestAt == null -> 1
+                            else -> 2
+                        }
+                    }
+                }
                 coroutineScope {
                     val results = Channel<Pair<String, Long?>>(Channel.UNLIMITED)
                     val writer = launch {
+                        val measuredMembers = mutableMapOf<String, Long?>()
+                        val publishedBalancers = mutableSetOf<String>()
+                        val emptyBalancers = balancers.filterValues { it.isEmpty() }.keys
+                        if (emptyBalancers.isNotEmpty()) {
+                            repository.setProfileDelays(emptyBalancers.map { it.id to null }, System.currentTimeMillis())
+                            publishedBalancers.addAll(emptyBalancers.map { it.id })
+                        }
                         while (true) {
                             val first = results.receiveCatching().getOrNull() ?: break
                             val batch = mutableListOf(first)
                             delay(150)
                             while (true) batch.add(results.tryReceive().getOrNull() ?: break)
+                            batch.forEach { (id, delay) -> measuredMembers[id] = delay }
+                            for ((balancer, members) in balancers) {
+                                if (balancer.id in publishedBalancers || members.any { it.id !in measuredMembers }) continue
+                                val best = members.mapNotNull { measuredMembers[it.id]?.takeIf { value -> value >= 0 } }
+                                    .minOrNull()
+                                batch.add(balancer.id to best)
+                                publishedBalancers.add(balancer.id)
+                            }
                             repository.setProfileDelays(batch, System.currentTimeMillis())
                         }
                     }
                     try {
                         val next = java.util.concurrent.atomic.AtomicInteger()
-                        List(pingWorkerCount(profiles.size)) {
+                        List(minOf(queue.size, parallelism)) {
                             launch {
                                 while (currentCoroutineContext().isActive) {
-                                    val profile = profiles.getOrNull(next.getAndIncrement()) ?: break
-                                    pingSemaphore.withPermit {
-                                        currentCoroutineContext().ensureActive()
-                                        val measured = try {
-                                            tunnelClient.measureDelay(XrayConfigBuilder.buildTest(profile), testUrl)
-                                        } catch (e: CancellationException) { throw e }
-                                        catch (_: Exception) { null }
-                                        currentCoroutineContext().ensureActive()
-                                        results.send(profile.id to measured)
+                                    val profile = queue.getOrNull(next.getAndIncrement()) ?: break
+                                    val measured = if (largeList) {
+                                        measureServerDelay(profile, testUrl)
+                                    } else {
+                                        regularPingSemaphore.withPermit { measureServerDelay(profile, testUrl) }
                                     }
+                                    results.send(profile.id to measured)
                                 }
                             }
                         }.joinAll()
@@ -1061,21 +1163,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Measures the selected server's delay right now — the servers screen's selected row
-     * and Home's chip share the result. Returns null when there is nothing to measure.
-     */
-    fun pingSelected() {
-        val profile = selectedProfile.value ?: return
-        // A balancer is measured by living: the live loop reports the tunnel's own delay.
-        if (profile.type == ProfileType.BALANCER) return
-        viewModelScope.launch(Dispatchers.IO) {
-            val delay = tunnelClient.measureDelay(
-                XrayConfigBuilder.buildTest(profile),
-                connection.value.delayTestUrl,
-            )
-            repository.setProfileDelay(profile.id, delay, System.currentTimeMillis())
+    private suspend fun measureServerDelay(profile: ProfileEntity, testUrl: String): Long? =
+        pingSemaphore.withPermit {
+            withContext(Dispatchers.IO) {
+                try {
+                    tunnelClient.measureDelay(XrayConfigBuilder.buildTest(profile), testUrl)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+            }
         }
+
+    private val individualPings = mutableMapOf<String, Job>()
+
+    fun pingServer(id: String) {
+        val profile = _servers.value.profiles.firstOrNull { it.id == id } ?: return
+        if (pingNetworkLost) return
+        if (profile.type == ProfileType.BALANCER) {
+            startServerSweep(onlyUntested = false, targetProfileId = id)
+            return
+        }
+        individualPings[id]?.cancel()
+        individualPings[id] = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val delay = regularPingSemaphore.withPermit {
+                    measureServerDelay(profile, connection.value.delayTestUrl)
+                }
+                repository.setProfileDelay(id, delay, System.currentTimeMillis())
+            } finally {
+                if (individualPings[id] == currentCoroutineContext()[Job]) individualPings.remove(id)
+            }
+        }
+        individualPings[id]?.start()
     }
 
     // ------------------------------------------------------------ home + stats loops
@@ -1338,14 +1459,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
 
     private companion object {
-        const val MAX_PING_CONCURRENCY = 10
-        const val PING_SERVERS_PER_WORKER = 10
-
-        fun pingWorkerCount(profileCount: Int): Int {
-            if (profileCount == 0) return 0
-            val workers = (profileCount - 1) / PING_SERVERS_PER_WORKER + 1
-            return minOf(workers, MAX_PING_CONCURRENCY)
-        }
+        const val REGULAR_PING_CONCURRENCY = 10
+        const val LARGE_PING_LIST_THRESHOLD = 45
 
         /** The graph window: history older than this falls off the left edge. */
         const val STATS_WINDOW_MILLIS = 15 * 60_000L

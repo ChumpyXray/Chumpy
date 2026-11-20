@@ -1,5 +1,6 @@
 package slop.miho.chumpy.ui.main
 
+import androidx.core.net.toUri
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -644,6 +645,7 @@ private fun ToggleRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
     onLongClick: (() -> Unit)? = null,
+    rotateIconOnClick: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -697,6 +699,7 @@ private fun ToggleRow(
             pressed = pressed,
             taps = taps,
             focused = { rowFocused },
+            rotateOnClick = rotateIconOnClick,
         )
     }
 }
@@ -713,6 +716,7 @@ private fun ToggleIconTile(
     pressed: Boolean,
     taps: Int,
     focused: (() -> Boolean)? = null,
+    rotateOnClick: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
@@ -726,6 +730,11 @@ private fun ToggleIconTile(
         targetValue = if (checked) colors.onPrimary else colors.onSecondaryContainer,
         animationSpec = motion.defaultEffectsSpec(),
         label = "toggle tile content",
+    )
+    val rotation = animateFloatAsState(
+        targetValue = if (rotateOnClick) taps * 360f else 0f,
+        animationSpec = motion.defaultSpatialSpec(),
+        label = "toggle icon rotation",
     )
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -745,7 +754,9 @@ private fun ToggleIconTile(
                 Icon(
                     painter = painterResource(res),
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer { rotationZ = rotation.value },
                 )
             }
         }
@@ -1155,6 +1166,7 @@ fun ConnectionScreen(
                 {
                     HappToggleRow(
                         checked = settings.happSpoof,
+                        incy = settings.incySpoof,
                         onToggle = { enabled ->
                             onChangeSettings { it.copy(happSpoof = enabled) }
                             if (enabled) happOpen = false
@@ -1170,6 +1182,16 @@ fun ConnectionScreen(
             ),
             rows = listOf(
                 {
+                    ToggleRow(
+                        title = stringResource(R.string.incy_spoof),
+                        supporting = null,
+                        icon = R.drawable.ic_settings,
+                        rotateIconOnClick = true,
+                        checked = settings.incySpoof,
+                        onChange = { enabled -> onChangeSettings { it.copy(incySpoof = enabled) } },
+                    )
+                },
+                {
                     HappRegenerateRow(
                         onRegenerate = { happRegenPending = true },
                     )
@@ -1177,8 +1199,12 @@ fun ConnectionScreen(
                 {
                     HappFieldRow(
                         label = stringResource(R.string.happ_app_version),
-                        value = settings.happAppVersion,
-                        onChange = { value -> onChangeSettings { it.copy(happAppVersion = value) } },
+                        value = if (settings.incySpoof) settings.incyAppVersion else settings.happAppVersion,
+                        onChange = { value ->
+                            onChangeSettings {
+                                if (it.incySpoof) it.copy(incyAppVersion = value) else it.copy(happAppVersion = value)
+                            }
+                        },
                     )
                 },
                 {
@@ -1246,8 +1272,9 @@ fun ConnectionScreen(
                         BackgroundRefreshRow(
                             supporting = when {
                                 autoCount == 0 -> stringResource(R.string.per_app_disabled)
-                                else -> stringResource(
-                                    R.string.settings_background_refresh_count,
+                                else -> pluralStringResource(
+                                    R.plurals.settings_background_refresh_count,
+                                    autoCount,
                                     autoCount,
                                 )
                             },
@@ -1521,6 +1548,7 @@ private fun TestUrlRow(
 @Composable
 private fun HappToggleRow(
     checked: Boolean,
+    incy: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -1551,7 +1579,7 @@ private fun HappToggleRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.happ_title),
+                text = stringResource(if (incy) R.string.incy_spoof else R.string.happ_title),
                 style = MaterialTheme.typography.bodyLarge,
                 color = colors.onSurface,
             )
@@ -1882,10 +1910,10 @@ private fun PlainRow(
 fun AboutScreen(
     coreVersion: String?,
     coreRunning: Boolean,
+    modifier: Modifier = Modifier,
     update: UpdateUiState = UpdateUiState(),
     onUpdateChipTap: () -> Unit = {},
     onCheckForUpdate: () -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
     val contentUnderBar by remember(scrollState) {
@@ -2087,7 +2115,7 @@ private fun ExternalLinkRow(
         supporting = supporting,
         icon = icon,
     ) {
-        context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
     }
 }
 

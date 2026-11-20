@@ -23,17 +23,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.res.stringResource
+import slop.miho.chumpy.sub.SubscriptionLink
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -46,6 +52,10 @@ import slop.miho.chumpy.ui.welcome.WelcomeScreen
 import kotlin.math.hypot
 
 class MainActivity : ControllerActivity() {
+    private var pendingSubscription by mutableStateOf<String?>(null)
+    private var importingSubscription by mutableStateOf(false)
+    private var subscriptionImportError by mutableStateOf<String?>(null)
+
     companion object {
         /** The update notification's tap: hand the downloaded APK to the installer. */
         const val EXTRA_INSTALL_UPDATE = "install_update"
@@ -61,6 +71,8 @@ class MainActivity : ControllerActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         orbOpening.value = intent?.getBooleanExtra(EXTRA_FROM_ORB, false) == true
+        pendingSubscription = savedInstanceState?.getString("pending_subscription")
+        if (savedInstanceState == null) receiveSubscription(intent)
         setContent {
             val viewModel: MainViewModel = viewModel()
             val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -73,11 +85,46 @@ class MainActivity : ControllerActivity() {
             val notificationsAsk by viewModel.notificationsAsk.collectAsStateWithLifecycle()
             LaunchedEffect(notificationsAsk) {
                 if (notificationsAsk) {
-                    notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
                     viewModel.consumeNotificationsAsk()
                 }
             }
             ChumpyTheme(settings = settings) {
+                pendingSubscription?.let { url ->
+                    AlertDialog(
+                        onDismissRequest = { if (!importingSubscription) pendingSubscription = null },
+                        title = { Text(stringResource(R.string.subscription_link_title)) },
+                        text = {
+                            Text(subscriptionImportError ?: if (importingSubscription) {
+                                getString(R.string.phone_import_importing)
+                            } else url)
+                        },
+                        confirmButton = {
+                            TextButton(
+                                enabled = !importingSubscription,
+                                onClick = {
+                                    importingSubscription = true
+                                    subscriptionImportError = null
+                                    withLocalNetworkPermission {
+                                        viewModel.addSubscription(url) { error ->
+                                            importingSubscription = false
+                                            subscriptionImportError = error
+                                            if (error == null) pendingSubscription = null
+                                        }
+                                    }
+                                },
+                            ) { Text(stringResource(R.string.phone_import_confirm)) }
+                        },
+                        dismissButton = {
+                            TextButton(
+                                enabled = !importingSubscription,
+                                onClick = { pendingSubscription = null },
+                            ) { Text(stringResource(R.string.subscription_cancel)) }
+                        },
+                    )
+                }
 
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     val motion = MaterialTheme.motionScheme
@@ -118,10 +165,13 @@ class MainActivity : ControllerActivity() {
                                 // main shell takes over the window the moment it composes.
                                 SystemBarsIconsDark(dark = LocalDarkTheme.current)
                                 WelcomeScreen(
-                                    onAddSubscription = viewModel::addSubscription,
+                                    onAddSubscription = { url, name, done ->
+                                        withLocalNetworkPermission { viewModel.addSubscription(url, name, done) }
+                                    },
                                     onImport = viewModel::addManualProfiles,
                                 )
                             }
+
                         }
                     }
                 }
@@ -137,6 +187,8 @@ class MainActivity : ControllerActivity() {
         // A warm open from the widget fires the morph again — the hand-off belongs to
         // the tap, not to the activity's birth.
         orbOpening.value = intent.getBooleanExtra(EXTRA_FROM_ORB, false)
+        setIntent(intent)
+        if (!importingSubscription) receiveSubscription(intent)
         handleInstallRequest(intent)
     }
 
@@ -151,6 +203,18 @@ class MainActivity : ControllerActivity() {
         // The same instance the compose tree holds: the stats loops sample once a second
         // while this is true.
         ViewModelProvider(this)[MainViewModel::class.java].setAppInForeground(true)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        if (!importingSubscription) outState.putString("pending_subscription", pendingSubscription)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun receiveSubscription(intent: Intent) {
+        if (intent.action != Intent.ACTION_VIEW) return
+        pendingSubscription = intent.dataString?.let(SubscriptionLink::parse)
+        subscriptionImportError = null
+        intent.data = null
     }
 
     override fun onStop() {

@@ -1,6 +1,7 @@
 package slop.miho.chumpy.core;
 
 import slop.miho.chumpy.core.ITunnelCallback;
+import slop.miho.chumpy.core.IDelayResult;
 
 interface ITunnelService {
     /**
@@ -18,9 +19,9 @@ interface ITunnelService {
 
     /**
      * Measures the real delay through the given complete Xray config (one tested outbound,
-     * no inbounds) in the core process. Returns the delay in millis, or -1 on failure.
+     * no inbounds) in the core process. The callback receives -1 on failure.
      */
-    long measureDelay(String configJson, String testUrl);
+    void measureDelay(String configJson, String testUrl, IDelayResult result);
 
     /**
      * Measures the delay through the *running* core's tunnel, fetching [testUrl] through

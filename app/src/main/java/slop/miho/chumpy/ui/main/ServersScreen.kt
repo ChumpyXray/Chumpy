@@ -1,6 +1,19 @@
 package slop.miho.chumpy.ui.main
 
+import androidx.core.graphics.createBitmap
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import android.content.Intent
+import androidx.core.net.toUri
+import androidx.compose.material3.FilledTonalIconButton
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
@@ -43,6 +56,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
@@ -109,6 +123,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -127,6 +143,7 @@ import kotlin.math.roundToInt
 import slop.miho.chumpy.ui.components.restoreControllerFocus
 import slop.miho.chumpy.ui.components.controllerContextMenu
 import slop.miho.chumpy.ui.components.hasUsableCamera
+import slop.miho.chumpy.ui.components.controllerReadFocus
 import slop.miho.chumpy.ui.components.externalAction
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -181,12 +198,14 @@ fun ServersScreen(
     subscriptions: List<SubscriptionEntity>,
     selectedSubscription: SubscriptionEntity?,
     state: ServersUiState,
+    modifier: Modifier = Modifier,
     week: List<DailyTraffic> = emptyList(),
     manualCount: Int = 0,
     flagStyle: FlagStyle = FlagStyle.TWEMOJI,
     tunnelUp: Boolean = false,
     onUpdate: () -> Unit,
     onPing: () -> Unit,
+    onPingServer: (String) -> Unit,
     onSelectSubscription: (String) -> Unit,
     onAddSubscription: (url: String, name: String?, onDone: (String?) -> Unit) -> Unit,
     onDeleteSubscription: (String) -> Unit,
@@ -196,7 +215,6 @@ fun ServersScreen(
     onToggleConcealed: (String, Boolean) -> Unit,
     onSelect: (String) -> Unit,
     onSortServers: (ServersSort) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     // The subscription dropdown's open state; survives page switches so a dialog opened
     // from an unfolded card still has its list waiting behind it.
@@ -488,7 +506,7 @@ fun ServersScreen(
                 // While the fold stands or settles the spring steps aside — see
                 // [movesSettled] — so the rows never chase the fold's own clock.
                 Box(Modifier
-                    .then(if (movesSettled) {
+                    .then(if (movesSettled && !(state.isPinging && state.sort == ServersSort.PING)) {
                         Modifier.animateItem(placementSpec = motion.defaultSpatialSpec())
                     } else {
                         Modifier
@@ -506,6 +524,7 @@ fun ServersScreen(
                         flagStyle = flagStyle,
                         tunnelUp = tunnelUp,
                         onSelect = onSelect,
+                        onPingServer = onPingServer,
                         onDelete = { onDeleteManualProfile(it.id) },
                         onTogglePinned = onTogglePinned,
                         onToggleConcealed = onToggleConcealed,
@@ -659,6 +678,60 @@ private fun ServersHeader(
 private val LocalSubscriptionUpdateFocus = androidx.compose.runtime.staticCompositionLocalOf<FocusRequester?> { null }
 
 @Composable
+private fun SubscriptionDetails(subscription: SubscriptionEntity, supportingColor: Color) {
+    if (subscription.announcement == null && subscription.supportUrl == null && subscription.webPageUrl == null) return
+
+    val hasLinks = subscription.webPageUrl != null || subscription.supportUrl != null
+    val gap = if (subscription.announcement != null && hasLinks) 8.dp else 0.dp
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hasLinks) {
+            subscription.webPageUrl?.let { url ->
+                SubscriptionLinkButton(url, R.drawable.ic_public, R.string.subscription_website)
+            } ?: Spacer(Modifier.width(48.dp))
+        }
+        val center = Modifier.weight(1f)
+        val announcement = subscription.announcement
+        if (announcement != null) {
+            Text(
+                text = announcement,
+                color = supportingColor,
+                style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Paragraph),
+                textAlign = TextAlign.Center,
+                modifier = center.controllerReadFocus(),
+            )
+        } else {
+            Spacer(center)
+        }
+        if (hasLinks) {
+            subscription.supportUrl?.let { url ->
+                SubscriptionLinkButton(url, R.drawable.ic_person, R.string.subscription_support)
+            } ?: Spacer(Modifier.width(48.dp))
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionLinkButton(url: String, icon: Int, description: Int) {
+    val context = LocalContext.current
+    val uri = remember(url) { url.toUri() }
+    val glyph = when (uri.host?.lowercase()) {
+        "t.me", "telegram.me", "telegram.dog", "www.t.me", "www.telegram.me", "www.telegram.dog" -> R.drawable.ic_telegram
+        else -> icon
+    }
+    FilledTonalIconButton(
+        onClick = { context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) } },
+        modifier = Modifier.size(48.dp).focusRing(circular = true, inset = true, gap = 1.dp),
+        shape = CircleShape,
+    ) {
+        Icon(painterResource(glyph), contentDescription = stringResource(description))
+    }
+}
+
+@Composable
 private fun SubscriptionCard(
     subscription: SubscriptionEntity?,
     isUpdating: Boolean,
@@ -751,35 +824,38 @@ private fun SubscriptionCard(
                             daysTitle(sub.expireEpochSeconds) != null ||
                             consumedText(sub) != null
                         )
-                    AnimatedContent(
-                        targetState = hasReport,
-                        transitionSpec = {
-                            ContentTransform(
-                                targetContentEnter = fadeIn(motion.defaultEffectsSpec()),
-                                initialContentExit = fadeOut(motion.defaultEffectsSpec()),
-                                sizeTransform = SizeTransform(clip = false),
-                            )
-                        },
-                        label = "subscription report stance",
-                    ) { full ->
-                        if (full && sub != null) {
-                            SubscriptionReportFace(
-                                subscription = sub,
-                                isUpdating = isUpdating,
-                                week = week,
-                                contentColor = contentColor,
-                                supportingColor = supportingColor,
-                                onUpdate = onUpdate,
-                            )
-                        } else {
-                            SubscriptionCompactFace(
-                                subscription = sub,
-                                isUpdating = isUpdating,
-                                contentColor = contentColor,
-                                supportingColor = supportingColor,
-                                onUpdate = onUpdate,
-                            )
+                    Column {
+                        AnimatedContent(
+                            targetState = hasReport,
+                            transitionSpec = {
+                                ContentTransform(
+                                    targetContentEnter = fadeIn(motion.defaultEffectsSpec()),
+                                    initialContentExit = fadeOut(motion.defaultEffectsSpec()),
+                                    sizeTransform = SizeTransform(clip = false),
+                                )
+                            },
+                            label = "subscription report stance",
+                        ) { full ->
+                            if (full && sub != null) {
+                                SubscriptionReportFace(
+                                    subscription = sub,
+                                    isUpdating = isUpdating,
+                                    week = week,
+                                    contentColor = contentColor,
+                                    supportingColor = supportingColor,
+                                    onUpdate = onUpdate,
+                                )
+                            } else {
+                                SubscriptionCompactFace(
+                                    subscription = sub,
+                                    isUpdating = isUpdating,
+                                    contentColor = contentColor,
+                                    supportingColor = supportingColor,
+                                    onUpdate = onUpdate,
+                                )
+                            }
                         }
+                        if (sub != null) SubscriptionDetails(sub, supportingColor)
                     }
                 }
             }
@@ -987,12 +1063,24 @@ private fun decodeLogoBytes(path: String): ImageBitmap? = try {
         // PNG's own signature.
         bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() &&
             bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte() ->
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            decodePngLogo(bytes)
         // Everything angle-bracketed is SVG here; the refresh already vetted the body.
         else -> decodeSvgLogo(bytes)
     }
 } catch (_: Exception) {
     null
+}
+
+private fun decodePngLogo(bytes: ByteArray): ImageBitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    while (bounds.outWidth.toLong() > 512L * sample || bounds.outHeight.toLong() > 512L * sample) {
+        sample *= 2
+    }
+    val options = BitmapFactory.Options().apply { inSampleSize = sample }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
 }
 
 private fun decodeSvgLogo(bytes: ByteArray): ImageBitmap? = try {
@@ -1009,7 +1097,7 @@ private fun decodeSvgLogo(bytes: ByteArray): ImageBitmap? = try {
     val scale = minOf(1f, cap / picture.width.toFloat(), cap / picture.height.toFloat())
     val width = (picture.width * scale).roundToInt().coerceAtLeast(1)
     val height = (picture.height * scale).roundToInt().coerceAtLeast(1)
-    val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(width, height)
     android.graphics.Canvas(bitmap).apply {
         scale(scale, scale)
         drawPicture(picture)
@@ -2106,6 +2194,7 @@ private fun ServerGroupRow(
     flagStyle: FlagStyle,
     tunnelUp: Boolean,
     onSelect: (String) -> Unit,
+    onPingServer: (String) -> Unit,
     onDelete: (ProfileEntity) -> Unit,
     onTogglePinned: (String, Boolean) -> Unit,
     onToggleConcealed: (String, Boolean) -> Unit,
@@ -2147,6 +2236,7 @@ private fun ServerGroupRow(
         // The long press's own door — always open, unlike the menu it opens: the
         // plumbing above is born on first use, so the press can't ride on it.
         onMenuOpen = { onMenuHostChange(profile.id) },
+        onPing = { onPingServer(profile.id) },
         // Every config row carries the menu, but not every one the same
         // menu: the loose configs own themselves — the pin, the hide and
         // the delete are theirs, the copy of the link they were born from
@@ -2224,6 +2314,7 @@ private fun ServerRow(
     // The long press's own door — always open, unlike the menu it opens: the menu's
     // plumbing is born on first use (see ServerGroupRow), so the press can't ride on it.
     onMenuOpen: () -> Unit,
+    onPing: () -> Unit,
     menu: RowMenu?,
     dimmed: Boolean,
     shape: Shape,
@@ -2298,15 +2389,53 @@ private fun ServerRow(
     }
     val iconColor = lerp(colors.onSecondaryContainer, colors.onPrimary, selection)
     val poke = rememberHapticPoke()
-    // The sweep's answers land one by one, and each hand-over on the row's ping chip —
-    // the old number out, the new one flying in — taps the soft poke: a sweep pokes a
-    // dozen rows in a couple of seconds, and the full tap amplitude machine-guns on a
-    // good motor. The first reading a row composes with is its own, not a change.
+    val displayedDelay = profile.testDelayMillis?.takeIf { it >= 0 }
+    val hasPingResult = displayedDelay != null || profile.lastTestAt != null
     val resultPoke = rememberHapticSoftPoke()
     var measured by remember(profile.id) { mutableStateOf(false) }
-    LaunchedEffect(profile.id, profile.testDelayMillis, profile.lastTestAt) {
-        if (measured) resultPoke()
+    LaunchedEffect(profile.id, displayedDelay, hasPingResult) {
+        if (measured && hasPingResult) resultPoke()
         measured = true
+    }
+
+    val canPing = !profile.concealed
+    val swipeEnabled = canPing && !dimmed && menu?.open != true &&
+        LocalInputMode.current != InputMode.CONTROLLER
+    val pingLabel = stringResource(R.string.server_ping_action)
+    val latestPing by rememberUpdatedState(onPing)
+    val swipeOffset = remember(profile.id) { mutableFloatStateOf(0f) }
+    val swipeVisible by remember(swipeOffset) { derivedStateOf { swipeOffset.floatValue > 0f } }
+    val swipeScope = rememberCoroutineScope()
+    val swipe = if (swipeEnabled) Modifier.pointerInput(profile.id) {
+        val reveal = 72.dp.toPx()
+        var settle: kotlinx.coroutines.Job? = null
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            val start = awaitHorizontalTouchSlopOrCancellation(down.id) { change, delta ->
+                if (delta > 0f) {
+                    settle?.cancel()
+                    swipeOffset.floatValue = delta.coerceAtMost(reveal)
+                    change.consume()
+                }
+            } ?: return@awaitEachGesture
+            try {
+                val completed = horizontalDrag(start.id) { change ->
+                    swipeOffset.floatValue = (swipeOffset.floatValue +
+                        change.position.x - change.previousPosition.x).coerceIn(0f, reveal)
+                    change.consume()
+                }
+                if (completed && swipeOffset.floatValue >= reveal * 0.75f) latestPing()
+            } finally {
+                settle = swipeScope.launch {
+                    animate(swipeOffset.floatValue, 0f) { value, _ ->
+                        swipeOffset.floatValue = value
+                    }
+                }
+            }
+        }
+    } else Modifier
+    LaunchedEffect(swipeEnabled) {
+        if (!swipeEnabled) swipeOffset.floatValue = 0f
     }
 
     // The row's own frame, clipping to nothing: every Surface clips to its shape,
@@ -2317,15 +2446,31 @@ private fun ServerRow(
     // the pin each in their own layer instead, so the one follows the other into
     // the half-light without losing the pin's overhang.
     Box(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(swipe)
+            .then(if (swipeVisible) Modifier.clipToBounds() else Modifier),
     ) {
+        if (swipeVisible) {
+            Box(Modifier.matchParentSize().clip(shape)) {
+                Box(
+                    modifier = Modifier.width(72.dp).fillMaxHeight()
+                        .graphicsLayer { translationX = swipeOffset.floatValue - size.width }
+                        .background(colors.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(painterResource(R.drawable.ic_speed_normal), null, tint = colors.onPrimaryContainer)
+                }
+            }
+        }
         Surface(
             shape = shape,
             color = containerColor,
             contentColor = contentColor,
             modifier = Modifier
                 .fillMaxWidth()
-                .graphicsLayer { alpha = dim * foldDim() },
+                .graphicsLayer {
+                    alpha = dim * foldDim()
+                    translationX = swipeOffset.floatValue
+                },
         ) {
             // The row's body laid out by hand, to ListItem's own drawing — the M3
             // component carries a colors machine and a defaults table every row paid
@@ -2337,13 +2482,14 @@ private fun ServerRow(
                     .focusRing(inset = true, gap = 1.dp)
                     .restoreControllerFocus(menu?.open == true)
                     .controllerContextMenu { onMenuOpen() }
+                    .then(if (canPing) Modifier.semantics {
+                        customActions = listOf(CustomAccessibilityAction(pingLabel) { onPing(); true })
+                    } else Modifier)
                     .combinedClickable(
                         role = Role.Button,
                         onClick = {
-                            if (!selected) {
-                                poke()
-                                onSelect()
-                            }
+                            if (!selected) poke()
+                            onSelect()
                         },
                         // The long press opens the row's own menu — the pin, the
                         // link, the delete — for the loose configs, the rows that
@@ -2423,35 +2569,31 @@ private fun ServerRow(
                         // hand-over rides a full transition per row, a price the weak
                         // devices the mode is for pay on every page open, for an
                         // animation they asked to shed.
-                        if (profile.type != ProfileType.BALANCER) {
+                        run {
                             if (LocalUiSettings.current.simpleTransitions) {
-                                if (profile.testDelayMillis != null || profile.lastTestAt != null) {
+                                if (hasPingResult) {
                                     Text(
-                                        text = "  ·  " + when {
-                                            profile.testDelayMillis == null || profile.testDelayMillis < 0 ->
-                                                stringResource(R.string.servers_offline)
-                                            else ->
-                                                stringResource(R.string.servers_ping_ms, profile.testDelayMillis.toInt())
-                                        },
+                                        text = "  ·  " + (displayedDelay?.let {
+                                            stringResource(R.string.servers_ping_ms, it.toInt())
+                                        } ?: stringResource(R.string.servers_offline)),
                                         color = extraColor,
                                         maxLines = 1,
                                     )
                                 }
                             } else {
                                 AnimatedContent(
-                                    targetState = profile.testDelayMillis to profile.lastTestAt,
+                                    targetState = displayedDelay to hasPingResult,
                                     transitionSpec = {
                                         (fadeIn(motion.defaultEffectsSpec()) +
                                             slideInHorizontally(motion.defaultSpatialSpec()) { it / 2 }) togetherWith
                                             fadeOut(motion.defaultEffectsSpec())
                                     },
                                     label = "ping",
-                                ) { (delay, _) ->
-                                    if (delay != null || profile.lastTestAt != null) {
-                                        val text = when {
-                                            delay == null || delay < 0 -> stringResource(R.string.servers_offline)
-                                            else -> stringResource(R.string.servers_ping_ms, delay.toInt())
-                                        }
+                                ) { (delay, show) ->
+                                    if (show) {
+                                        val text = delay?.let {
+                                            stringResource(R.string.servers_ping_ms, it.toInt())
+                                        } ?: stringResource(R.string.servers_offline)
                                         Text(
                                             text = "  ·  $text",
                                             color = extraColor,
@@ -2565,6 +2707,7 @@ private fun protocolLabel(profile: ProfileEntity): String? = when (profile.type)
     slop.miho.chumpy.db.ProfileType.TROJAN -> "trojan"
     slop.miho.chumpy.db.ProfileType.SHADOWSOCKS -> "ss"
     slop.miho.chumpy.db.ProfileType.SOCKS -> "socks"
+    slop.miho.chumpy.db.ProfileType.HTTP -> if (profile.security == "tls") "https" else "http"
     slop.miho.chumpy.db.ProfileType.WIREGUARD -> "wireguard"
     slop.miho.chumpy.db.ProfileType.HYSTERIA2 -> "hysteria2"
     // The supporting line of a balancer row is its own — see balancerStrategyLabel.

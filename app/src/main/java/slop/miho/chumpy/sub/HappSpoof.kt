@@ -1,6 +1,7 @@
 package slop.miho.chumpy.sub
 
 import android.os.Build
+import slop.miho.chumpy.BuildConfig
 import slop.miho.chumpy.data.UiSettings
 import java.net.HttpURLConnection
 import java.security.SecureRandom
@@ -18,7 +19,8 @@ import java.util.Locale
  */
 object HappSpoof {
     /** The Happ version the spoof claims; pinned, like a real client's would be. */
-    const val DEFAULT_APP_VERSION = "3.21.1"
+    const val DEFAULT_APP_VERSION = "4.11.2"
+    const val DEFAULT_INCY_APP_VERSION = "4.0.1"
 
     private const val DEFAULT_OS = "Android"
     private const val DEFAULT_LOCALE = "en"
@@ -39,6 +41,7 @@ object HappSpoof {
         val locale: String,
         val userId: String,
         val hwid: String,
+        val incy: Boolean = false,
     )
 
     /** A 20-digit user id, the shape Happ's own ids carry. */
@@ -65,7 +68,8 @@ object HappSpoof {
     fun UiSettings.happFingerprint(): Fingerprint? {
         if (!happSpoof) return null
         return Fingerprint(
-            appVersion = happAppVersion.ifBlank { DEFAULT_APP_VERSION },
+            appVersion = if (incySpoof) incyAppVersion.ifBlank { DEFAULT_INCY_APP_VERSION } else happAppVersion.ifBlank { DEFAULT_APP_VERSION },
+            incy = incySpoof,
             os = happOs.ifBlank { DEFAULT_OS },
             osVersion = happOsVersion.ifBlank { defaultOsVersion() },
             deviceModel = happDeviceModel.ifBlank { defaultDeviceModel() },
@@ -76,18 +80,20 @@ object HappSpoof {
     }
 
     /**
-     * Dresses the connection up as the Happ client: the UA carries the version, OS and
-     * user id; the x- headers carry the rest of the fingerprint.
+     * Keeps the configured Happ version and platform in the User-Agent, identifies
+     * Chumpy and its build version, and ends with the existing client identifier.
      */
     fun headers(fingerprint: Fingerprint): Map<String, String> = mapOf(
-        "User-Agent" to "Happ/${fingerprint.appVersion}/${fingerprint.os}/${fingerprint.userId}",
+        "User-Agent" to "${if (fingerprint.incy) "INCY" else "Happ"}/${fingerprint.appVersion}/${fingerprint.os}/Chumpy/${BuildConfig.VERSION_NAME}/${fingerprint.userId}",
         "x-device-locale" to fingerprint.locale,
         "x-hwid" to fingerprint.hwid,
         "x-device-os" to fingerprint.os,
         "x-ver-os" to fingerprint.osVersion,
         "x-device-model" to fingerprint.deviceModel,
         "accept-encoding" to "gzip",
-    )
+    ).let { headers ->
+        if (fingerprint.incy) headers + ("X-Device-ID" to fingerprint.hwid) else headers
+    }
 
     fun apply(connection: HttpURLConnection, fingerprint: Fingerprint) {
         headers(fingerprint).forEach { (name, value) -> connection.setRequestProperty(name, value) }
