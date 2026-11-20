@@ -2,6 +2,7 @@ package slop.miho.chumpy
 
 import android.Manifest
 import android.content.Intent
+import android.graphics.Rect as ScreenRect
 import android.os.Bundle
 import slop.miho.chumpy.ui.components.ControllerActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,6 +39,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import slop.miho.chumpy.sub.SubscriptionLink
 import androidx.lifecycle.ViewModelProvider
@@ -67,10 +69,14 @@ class MainActivity : ControllerActivity() {
     /** True while the orb widget's opening morph is still running; re-fired per tap. */
     private val orbOpening = mutableStateOf(false)
 
+    /** The tapped widget's own bounds, if the launcher handed them over. */
+    private var orbSource by mutableStateOf<ScreenRect?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         orbOpening.value = intent?.getBooleanExtra(EXTRA_FROM_ORB, false) == true
+        orbSource = intent?.getSourceBounds()
         pendingSubscription = savedInstanceState?.getString("pending_subscription")
         if (savedInstanceState == null) receiveSubscription(intent)
         setContent {
@@ -134,7 +140,12 @@ class MainActivity : ControllerActivity() {
                     // The orb widget's opening morph, when the tap came from it: the
                     // shell reveals itself through a circle growing out of the middle.
                     val opening by orbOpening
-                    OrbMorph(active = opening, onDone = { orbOpening.value = false }) {
+                    val source = orbSource
+                    OrbMorph(
+                        active = opening,
+                        source = source,
+                        onDone = { orbOpening.value = false },
+                    ) {
                         AnimatedContent(
                             targetState = setupDone,
                             transitionSpec = {
@@ -187,6 +198,7 @@ class MainActivity : ControllerActivity() {
         // A warm open from the widget fires the morph again — the hand-off belongs to
         // the tap, not to the activity's birth.
         orbOpening.value = intent.getBooleanExtra(EXTRA_FROM_ORB, false)
+        orbSource = intent.getSourceBounds()
         setIntent(intent)
         if (!importingSubscription) receiveSubscription(intent)
         handleInstallRequest(intent)
@@ -226,16 +238,16 @@ class MainActivity : ControllerActivity() {
 }
 
 /**
- * The orb widget's opening morph: the app reveals itself through a circle growing out
- * of the middle of the screen — the widget's own shape handing the window over.
- * While it runs, the circle's rim glides outward and everything still outside it is
- * the theme's plain background; the shell shows through only where the circle has
- * already passed. A window-level scale-up would square the whole screen in; the
- * clip keeps it round, whatever the launch path was.
+ * The orb widget's opening morph: the app reveals itself through the widget's own
+ * circle — the main card, not the widget's whole rectangular box — growing out of
+ * the place on the screen the launcher says the widget sits. While it runs, the
+ * circle's rim glides outward and everything still outside it is the theme's plain
+ * background; the shell shows through only where the circle has already passed.
  */
 @Composable
 private fun OrbMorph(
     active: Boolean,
+    source: ScreenRect?,
     onDone: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -249,20 +261,33 @@ private fun OrbMorph(
         progress.animateTo(1f, tween(550, easing = CubicBezierEasing(0.22f, 0.8f, 0.2f, 1f)))
         onDone()
     }
+    val view = LocalView.current
+    val screenOffset = remember { IntArray(2) }
     val surround = MaterialTheme.colorScheme.surface
     Box(
         Modifier
             .fillMaxSize()
             .drawWithContent {
-                // The radius that finally covers the screen's far corners, from its
-                // middle: half the diagonal, a hair past it so the clip ends clean.
-                val cover = 1.02f * hypot(size.width, size.height) / 2f
-                val radius = progress.value * cover
-                val middleX = size.width / 2f
-                val middleY = size.height / 2f
+                view.getLocationOnScreen(screenOffset)
+                // The widget's own circle: centered in the source bounds, sized to
+                // their short side — the main card, never the whole widget box.
+                val originX = source?.let { it.exactCenterX() - screenOffset[0] }
+                    ?: size.width / 2f
+                val originY = source?.let { it.exactCenterY() - screenOffset[1] }
+                    ?: size.height / 2f
+                val startRadius = source?.let { minOf(it.width(), it.height()) / 2f } ?: 0f
+                // The radius that finally covers the screen's farthest corner from
+                // that origin, a hair past it so the clip ends clean.
+                val cover = 1.02f * maxOf(
+                    hypot(originX, originY),
+                    hypot(size.width - originX, originY),
+                    hypot(originX, size.height - originY),
+                    hypot(size.width - originX, size.height - originY),
+                )
+                val radius = startRadius + progress.value * (cover - startRadius)
                 val circle = Path().apply {
                     addOval(
-                        Rect(middleX - radius, middleY - radius, middleX + radius, middleY + radius),
+                        Rect(originX - radius, originY - radius, originX + radius, originY + radius),
                     )
                 }
                 // The shell shows through only where the circle has already passed;

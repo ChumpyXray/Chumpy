@@ -18,7 +18,6 @@ import slop.miho.chumpy.data.FlagStyle
 import slop.miho.chumpy.data.SettingsStore
 import slop.miho.chumpy.ui.theme.OrbWidgetColors
 import kotlin.math.max
-import kotlin.math.sqrt
 
 /**
  * What the orb says in its middle: the flag the panel put on the name (or the globe when
@@ -31,7 +30,7 @@ data class WidgetFace(
 )
 
 /**
- * One pinned tile: a flag alone in a square riding the orb's top edge. [active] marks the
+ * One pinned tile: a flag alone in a circle riding the orb's top edge. [active] marks the
  * pin the running (or selected) server is, so the fill tells the picked one from the rest.
  */
 data class WidgetPin(
@@ -43,24 +42,24 @@ data class WidgetPin(
 
 /**
  * The whole launcher widget, drawn into one bitmap. RemoteViews can do neither the
- * geometry nor the type: the connect button sits half inside the orb with its center
- * on the rim, the pin squares ride the top edge the same way, and the flags want the
+ * geometry nor the type: the connect button sits over the orb's bottom-right corner,
+ * the pin circles ride the top edge the same way, and the flags want the
  * bundled Twemoji font — none of which an ImageView-with-text arrives at. Drawing it
  * all ourselves also keeps the interactive zones honest: the provider frames its
  * invisible zone views to the very pixel boxes these paints draw.
  *
  * Nothing is measured off the widget's box — that box is never quite square, and
  * anything that follows it stretches. Everything is measured off the orb alone
- * ([orbBox]): the circle fills the box's short side, the connect button's diameter
- * is [BUTTON_SHARE] of that side with its center riding the rim toward the box's
- * bottom-right corner (the classic corner-badge fit on a square box), and the pin
- * tiles ride the orb's top-left corner at a small margin, in a row that squeezes
- * itself to fit — squares stay squares at any stretch.
+ * ([orbBox]): the circle fills the box's short side, the connect button's side
+ * is [BUTTON_SHARE] of that side with its box flush in the orb square's bottom-right
+ * corner, and the pin
+ * tiles ride the orb's top-left corner flush, three slots wide — squares stay
+ * squares at any stretch.
  */
 object WidgetRenderer {
 
     /** How many pin tiles the layout carves room for; the provider may fill fewer. */
-    const val PIN_SLOTS = 5
+    const val PIN_SLOTS = 3
 
     @Volatile
     private var inter: Typeface? = null
@@ -111,7 +110,7 @@ object WidgetRenderer {
         // ---- the orb ------------------------------------------------------------
         canvas.drawCircle(cx, cy, radius, fillPaint(fill))
 
-        // ---- the middle: flag, region, subscription -----------------------------
+        // ---- the middle: subscription, region, flag -----------------------------
         val flagBox = short * 0.30f
         val regionSize = short * 0.10f
         val subSize = short * 0.074f
@@ -133,59 +132,57 @@ object WidgetRenderer {
         val total = (flagLayout?.height ?: flagBox.toInt()) + gap + regionLayout.height +
             (subLayout?.let { gap * 0.7f + it.height } ?: 0f)
         // A touch below the mathematical middle: the pin row crowds the top edge, so
-        // the stack — the flag first of all — settles a little lower and breathes.
+        // the stack — the subscription first of all — settles a little lower and breathes.
         var top = cy - total / 2f + short * 0.015f
-        if (flagLayout != null) {
+        subLayout?.let {
             canvas.save()
-            canvas.translate(cx - flagLayout.width / 2f, top)
-            flagLayout.draw(canvas)
+            canvas.translate(cx - it.width / 2f, top)
+            it.draw(canvas)
             canvas.restore()
-            top += flagLayout.height + gap
-        } else {
-            drawVector(context, R.drawable.ic_public, content, canvas, cx, top + flagBox / 2f, flagBox)
-            top += flagBox + gap
+            top += it.height + gap * 0.7f
         }
         canvas.save()
         canvas.translate(cx - regionLayout.width / 2f, top)
         regionLayout.draw(canvas)
         canvas.restore()
-        subLayout?.let {
-            top += regionLayout.height + gap * 0.7f
+        top += regionLayout.height + gap
+        if (flagLayout != null) {
             canvas.save()
-            canvas.translate(cx - it.width / 2f, top)
-            it.draw(canvas)
+            canvas.translate(cx - flagLayout.width / 2f, top)
+            flagLayout.draw(canvas)
             canvas.restore()
+        } else {
+            drawVector(context, R.drawable.ic_public, content, canvas, cx, top + flagBox / 2f, flagBox)
         }
 
-        // ---- the connect button: size tied to the orb alone, center riding the rim
-        //      toward the hitbox's bottom-right corner ------------------------------
+        // ---- the connect button: size tied to the orb alone, box flush in the orb
+        //      square's bottom-right corner ---------------------------------------
         val button = buttonBox(w, h)
         val d = button.width()
         // Connected wears the accent; idle is the quiet inverted tone — the same pair
         // the app's own button keeps, just the other way around.
         val buttonFill = if (up) colors.primary else colors.onPrimary
         val buttonGlyph = if (up) colors.onPrimary else colors.primary
-        canvas.drawCircle(button.centerX(), button.centerY(), d / 2f, fillPaint(buttonFill))
+        canvas.drawRoundRect(
+            RectF(button.left, button.top, button.right, button.bottom),
+            d * 0.30f,
+            d * 0.30f,
+            fillPaint(buttonFill),
+        )
         drawVector(
             context, R.drawable.ic_power, buttonGlyph, canvas,
             button.centerX(), button.centerY(), d * 0.46f,
         )
 
-        // ---- the pinned squares --------------------------------------------------
+        // ---- the pinned circles --------------------------------------------------
         val count = pins.size.coerceAtMost(PIN_SLOTS)
         pins.take(count).forEachIndexed { index, pin ->
             val tile = pinRect(w, h, count, index) ?: return@forEachIndexed
             val side = tile.width()
-            val corner = side * 0.18f
             // No rims anywhere on this widget: the picked pin tells itself apart
             // by its fill alone, the way the connect button's color tells the tunnel.
             val tileFill = if (pin.active) colors.primary else colors.surfaceContainerHighest
-            canvas.drawRoundRect(
-                RectF(tile.left, tile.top, tile.right, tile.bottom),
-                corner,
-                corner,
-                fillPaint(tileFill),
-            )
+            canvas.drawCircle(tile.centerX(), tile.centerY(), side / 2f, fillPaint(tileFill))
             val glyphBox = side * 0.70f
             val glyph = flagLayout(context, pin.flag, flagStyle, glyphBox * 0.85f)
             if (glyph != null) {
@@ -245,32 +242,25 @@ object WidgetRenderer {
         return FrameF(left, top, left + side, top + side)
     }
 
-    /** The button's size against the orb's side — the square widget's corner-badge fit. */
-    internal val BUTTON_SHARE = 1f - 1f / sqrt(2f)
+    /** The button's side against the orb's side. */
+    internal val BUTTON_SHARE = 0.34f
 
     /**
-     * The connect button: its diameter is a share of the orb and nothing else — resize
+     * The connect button: its side is a share of the orb and nothing else — resize
      * the widget and the button scales with the circle, never with the box — and its
-     * center rides the rim along the direction of the hitbox's bottom-right corner.
-     * On a square box that answers the classic corner-badge fit exactly: center on
-     * the rim, box flush with the corner.
+     * box sits flush in the orb square's bottom-right corner. That corner is fixed
+     * against the circle, so a stretch never slides the button around; the larger
+     * side simply moves its center a little further inside the rim.
      */
     internal fun buttonBox(w: Float, h: Float): FrameF {
         val orb = orbBox(w, h)
-        val side = orb.width()
-        val d = BUTTON_SHARE * side
-        // The unit vector from the orb's middle toward the box's bottom-right corner.
-        val vx = w / 2f
-        val vy = h / 2f
-        val len = max(1f, sqrt(vx * vx + vy * vy))
-        val cx = w / 2f + (side / 2f) * (vx / len)
-        val cy = h / 2f + (side / 2f) * (vy / len)
-        return FrameF(cx - d / 2f, cy - d / 2f, cx + d / 2f, cy + d / 2f)
+        val d = BUTTON_SHARE * orb.width()
+        return FrameF(orb.right - d, orb.bottom - d, orb.right, orb.bottom)
     }
 
     /**
-     * One pinned slot's square: the row rides the orb box's top-left corner at a small
-     * margin, one tile after another with a gap between; a crowded row squeezes. All
+     * One pinned slot's square: the row rides the orb box's top-left corner flush,
+     * one tile after another with a gap between. All
      * of it in shares of the orb's side, so the tiles are square whatever the box.
      * Null when the row holds no such slot.
      */
@@ -279,29 +269,27 @@ object WidgetRenderer {
         val orb = orbBox(w, h)
         val side = orb.width()
         val tile = PinRow.side(count) * side
-        val margin = PinRow.MARGIN * side
         val gap = PinRow.GAP * side
-        val left = orb.left + margin + index * (tile + gap)
-        val top = orb.top + margin
+        val left = orb.left + index * (tile + gap)
+        val top = orb.top
         return FrameF(left, top, left + tile, top + tile)
     }
 
     /**
      * The pinned row's own measure, in shares of the orb's side — spelled once so the
-     * painter and the touch zones agree on it. The tiles sit a small margin off the
-     * corner and grow up to [MAX_SIDE]; a crowded row squeezes them just enough to fit.
+     * painter and the touch zones agree on it. The tiles sit flush with the corner and
+     * keep [MAX_SIDE] across the row's three slots.
      */
     internal object PinRow {
-        /** The breathing room between the corner, and between pin and pin. */
-        const val MARGIN = 0.04f
-        const val GAP = 0.02f
+        /** The breathing room between pin and pin. */
+        const val GAP = 0.015f
 
-        /** The pin size the row grows to before crowding starts. */
-        const val MAX_SIDE = 0.23f
+        /** The pin size every one of the row's three slots keeps. */
+        const val MAX_SIDE = 0.26f
 
         fun side(count: Int): Float {
             val n = count.coerceIn(1, PIN_SLOTS)
-            return minOf(MAX_SIDE, (1f - 2f * MARGIN - (n - 1) * GAP) / n)
+            return minOf(MAX_SIDE, (1f - (n - 1) * GAP) / n)
         }
     }
 

@@ -38,7 +38,7 @@ import slop.miho.chumpy.xray.XrayConfigBuilder
 /**
  * The launcher widget: the orb with the flag, the region and the subscription in its
  * middle, the connect button riding its bottom-right edge, and the pinned servers —
- * flags alone — in squares along the top. The whole picture is one bitmap
+ * flags alone — in circles along the top. The whole picture is one bitmap
  * ([WidgetRenderer]); the taps land on invisible zone views the provider frames to
  * the very pixel boxes that picture paints.
  *
@@ -279,9 +279,7 @@ class OrbWidget : AppWidgetProvider() {
     private fun pinId(slot: Int): Int = when (slot) {
         0 -> R.id.wgt_pin_0
         1 -> R.id.wgt_pin_1
-        2 -> R.id.wgt_pin_2
-        3 -> R.id.wgt_pin_3
-        else -> R.id.wgt_pin_4
+        else -> R.id.wgt_pin_2
     }
 
     private fun broadcast(context: Context, action: String, requestCode: Int, profileId: String?): PendingIntent =
@@ -443,8 +441,8 @@ class OrbWidget : AppWidgetProvider() {
     }
 
     /**
-     * The pinned squares: the selected subscription's own pins, the same order its list
-     * keeps, the first five. The active one — the running session's while up, the
+     * The pinned circles: the selected subscription's own pins, the same order its list
+     * keeps, the first three. The active one — the running session's while up, the
      * selection's while down — tells itself apart by its fill.
      */
     private suspend fun resolvePins(context: Context, state: TunnelState): List<WidgetPin> {
