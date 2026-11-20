@@ -43,6 +43,8 @@ data class ConnectionSettings(
      * everything again. The core reads it fresh off disk when a tunnel starts.
      */
     val bypassLan: Boolean = true,
+    val randomLocalPort: Boolean = true,
+    val localProxyPort: Int = XrayConfigBuilder.LOCAL_SOCKS_PORT,
 )
 
 object ConnectionStore {
@@ -90,6 +92,9 @@ object ConnectionStore {
             perAppEnabled = json.optBoolean(KEY_PER_APP, true),
             autoReconnect = json.optBoolean(KEY_AUTO_RECONNECT, false),
             bypassLan = json.optBoolean(KEY_BYPASS_LAN, true),
+            randomLocalPort = json.optBoolean("random_local_port", true),
+            localProxyPort = json.optInt("local_proxy_port", XrayConfigBuilder.LOCAL_SOCKS_PORT)
+                .takeIf { it in 1024..65535 } ?: XrayConfigBuilder.LOCAL_SOCKS_PORT,
         )
     }.getOrElse { read(context) }
 
@@ -117,6 +122,8 @@ object ConnectionStore {
             .put(KEY_PER_APP, settings.perAppEnabled)
             .put(KEY_AUTO_RECONNECT, settings.autoReconnect)
             .put(KEY_BYPASS_LAN, settings.bypassLan)
+            .put("random_local_port", settings.randomLocalPort)
+            .put("local_proxy_port", settings.localProxyPort)
         AtomicSnapshot.write(snapshot(context), json.toString())
     }
 
@@ -142,6 +149,9 @@ object ConnectionStore {
             perAppEnabled = prefs.getBoolean(KEY_PER_APP, true),
             autoReconnect = prefs.getBoolean(KEY_AUTO_RECONNECT, false),
             bypassLan = prefs.getBoolean(KEY_BYPASS_LAN, true),
+            randomLocalPort = prefs.getBoolean("random_local_port", true),
+            localProxyPort = prefs.getInt("local_proxy_port", XrayConfigBuilder.LOCAL_SOCKS_PORT)
+                .takeIf { it in 1024..65535 } ?: XrayConfigBuilder.LOCAL_SOCKS_PORT,
         )
     }
 
@@ -165,6 +175,8 @@ object ConnectionStore {
             .putBoolean(KEY_PER_APP, settings.perAppEnabled)
             .putBoolean(KEY_AUTO_RECONNECT, settings.autoReconnect)
             .putBoolean(KEY_BYPASS_LAN, settings.bypassLan)
+            .putBoolean("random_local_port", settings.randomLocalPort)
+            .putInt("local_proxy_port", settings.localProxyPort)
             .apply()
     }
 

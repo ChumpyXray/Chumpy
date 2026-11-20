@@ -21,7 +21,7 @@ import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
 import slop.miho.chumpy.BuildConfig
-import slop.miho.chumpy.xray.XrayConfigBuilder.LOCAL_SOCKS_PORT
+import slop.miho.chumpy.core.LocalProxy
 
 /**
  * A version triplet in the repo's own numbering: "0.6.227" — the major and minor ride the
@@ -96,7 +96,7 @@ object UpdateCheck {
      */
     private fun clientFor(tunnelUp: Boolean): OkHttpClient = if (!tunnelUp) client
     else client.newBuilder()
-        .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", LOCAL_SOCKS_PORT)))
+        .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", LocalProxy.currentPort())))
         .build()
 
     /** The device's own ABIs, the system's preference order first — the release's asset picks by it. */

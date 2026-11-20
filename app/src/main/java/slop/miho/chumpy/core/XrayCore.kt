@@ -197,13 +197,15 @@ object XrayCore {
             awaitInit()
             initFailed?.let { return IllegalStateException(it) }
             val core = controller ?: Cucore.newController().also { controller = it }
-            val bridge = NaiveTunnelConfig.prepareBridge(configJson)
+            val (sessionConfig, localPort) = LocalProxy.prepare(configJson)
+            val bridge = NaiveTunnelConfig.prepareBridge(sessionConfig)
             if (bridge != null) {
                 bridgeCore = Cucore.newController()
                 bridgeCore.start("sing-box", bridge.singBox)
             }
-            core.startTun(bridge?.xray ?: configJson, fd.toLong())
+            core.startTun(bridge?.xray ?: sessionConfig, fd.toLong())
             naiveController = bridgeCore
+            LocalProxy.publish(localPort)
             synchronized(this) {
                 if (lastUiTrafficAt == 0L) lastUiTrafficAt = SystemClock.elapsedRealtime()
             }

@@ -1132,6 +1132,30 @@ fun ConnectionScreen(
                 )
             },
         )
+        SettingsGroup(
+            {
+                ToggleRow(
+                    title = stringResource(R.string.random_local_port),
+                    supporting = stringResource(R.string.local_port_reconnect),
+                    icon = R.drawable.ic_renew,
+                    checked = connection.randomLocalPort,
+                    onChange = { enabled -> onChangeConnection { it.copy(randomLocalPort = enabled) } },
+                )
+            },
+            {
+                var port by remember(connection.localProxyPort) { mutableStateOf(connection.localProxyPort.toString()) }
+                HappFieldRow(
+                    label = stringResource(R.string.local_proxy_port),
+                    value = port,
+                    onChange = { value ->
+                        port = value
+                        value.toIntOrNull()?.takeIf { it in 1024..65535 }?.let { valid ->
+                            onChangeConnection { it.copy(localProxyPort = valid) }
+                        }
+                    },
+                )
+            },
+        )
         // The Happ spoof's own block, between the carrying and the measuring. The header
         // carries two rows of its own, separated by the fold rows' own 2dp seam: the
         // toggle ("Spoof as Happ", Enabled/Disabled) and the strings' doorway beneath

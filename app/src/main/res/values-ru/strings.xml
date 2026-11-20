@@ -344,4 +344,7 @@
     <string name="tunnel_error_stopping">VPN ещё отключается. Подождите немного и попробуйте снова.</string>
     <string name="tunnel_error_storage">На устройстве закончилось место. Освободите немного памяти и попробуйте снова.</string>
     <string name="incy_spoof">Маскировка под INCY</string>
+    <string name="random_local_port">Случайный локальный порт</string>
+    <string name="local_proxy_port">Локальный SOCKS-порт (1024–65535)</string>
+    <string name="local_port_reconnect">Применяется при следующем подключении VPN. Отключите случайный выбор, чтобы использовать указанный порт.</string>
 </resources>

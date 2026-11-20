@@ -9,6 +9,7 @@ import java.io.File
 class ChumpyApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        slop.miho.chumpy.core.LocalProxy.init(this)
         val processName = currentProcessName()
         if (processName.endsWith(":probe")) return
         if (processName.endsWith(":core")) {

@@ -17,7 +17,7 @@ import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
 
-import slop.miho.chumpy.xray.XrayConfigBuilder.LOCAL_SOCKS_PORT
+import slop.miho.chumpy.core.LocalProxy
 
 /**
  * Fetches a subscription body with cancellation and an overall deadline. When the tunnel is up the
@@ -57,10 +57,18 @@ class SubscriptionFetcher(
             .retryOnConnectionFailure(false)
             .build()
         }
-        val tunnelClient by lazy {
-            directClient.newBuilder()
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", LOCAL_SOCKS_PORT)))
-            .build()
+        private var tunnelPort = -1
+        private var cachedTunnelClient: OkHttpClient? = null
+
+        @Synchronized
+        fun tunnelClient(): OkHttpClient {
+            val port = LocalProxy.currentPort()
+            cachedTunnelClient?.takeIf { tunnelPort == port }?.let { return it }
+            cachedTunnelClient?.connectionPool?.evictAll()
+            tunnelPort = port
+            return directClient.newBuilder()
+                .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", port)))
+                .build().also { cachedTunnelClient = it }
         }
     }
 
@@ -86,7 +94,7 @@ class SubscriptionFetcher(
     }
 
     private suspend fun fetchResponse(rawUrl: String): FetchResult = suspendCancellableCoroutine { continuation ->
-        val client = if (tunnelUp()) tunnelClient else directClient
+        val client = if (tunnelUp()) tunnelClient() else directClient
         val request = Request.Builder().url(normalizeUrl(rawUrl)).get()
         val fingerprint = happSpoof()
         if (fingerprint != null) HappSpoof.headers(fingerprint).forEach { (name, value) -> request.header(name, value) }
@@ -124,7 +132,7 @@ class SubscriptionFetcher(
             continuation.resumeWithException(IOException("Geodata requires an HTTPS URL without embedded credentials"))
             return@suspendCancellableCoroutine
         }
-        val base = if (tunnelUp()) tunnelClient else directClient
+        val base = if (tunnelUp()) tunnelClient() else directClient
         val client = base.newBuilder().followSslRedirects(false).callTimeout(45, java.util.concurrent.TimeUnit.SECONDS).build()
         val call = client.newCall(Request.Builder().url(parsed).header("User-Agent", USER_AGENT).build())
         continuation.invokeOnCancellation { call.cancel() }
@@ -176,7 +184,7 @@ class SubscriptionFetcher(
      * Throws [IOException] with a readable message on failure.
      */
     suspend fun fetchLogo(url: okhttp3.HttpUrl): ByteArray = suspendCancellableCoroutine { continuation ->
-        val client = if (tunnelUp()) tunnelClient else directClient
+        val client = if (tunnelUp()) tunnelClient() else directClient
         val call = client.newCall(Request.Builder().url(url).header("User-Agent", USER_AGENT).build())
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
