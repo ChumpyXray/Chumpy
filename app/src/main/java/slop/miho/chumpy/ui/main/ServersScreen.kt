@@ -1,19 +1,11 @@
 package slop.miho.chumpy.ui.main
 
 import androidx.core.graphics.createBitmap
-import androidx.compose.animation.core.animate
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
-import androidx.compose.foundation.gestures.horizontalDrag
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import android.content.Intent
 import androidx.core.net.toUri
-import androidx.compose.material3.FilledTonalIconButton
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
@@ -123,9 +115,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
@@ -137,6 +132,7 @@ import android.graphics.BitmapFactory
 import com.caverock.androidsvg.SVG
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
@@ -445,7 +441,19 @@ fun ServersScreen(
                             }) {
                             // The half-light itself is laid per chip inside: the sort chip
                             // keeps its full paint while its own menu stands.
-                            ServersHeader(state = state, expired = selectedSubscription?.let { isExpired(it) } == true,
+                            ServersHeader(state = state,
+                                expired = selectedSubscription?.let { isExpired(it) } == true,
+                                links = remember(selectedSubscription) {
+                                    listOfNotNull(
+                                        selectedSubscription?.webPageUrl?.let {
+                                            SubscriptionLink(it, R.drawable.ic_public, R.string.subscription_website)
+                                        },
+                                        selectedSubscription?.supportUrl?.let {
+                                            SubscriptionLink(it, R.drawable.ic_person, R.string.subscription_support)
+                                        },
+                                    )
+                                },
+                                announcement = selectedSubscription?.announcement,
                                 alpha = headerAlpha,
                                 sortMenuOpen = menuHost == SORT_MENU_HOST,
                                 onSortMenuOpenChange = { openMenu(if (it) SORT_MENU_HOST else null) },
@@ -537,6 +545,8 @@ fun ServersScreen(
                         // group alpha that used to stand here sheared the pinned row's
                         // overhanging pin off at the row's edge whenever it dimmed.
                         foldDim = rowFoldDim,
+                        pingSweepStart = state.pingStartedAt,
+                        pingingIds = state.pingingIds,
                     )
                     if (dropdownOpen) {
                         Box(Modifier.matchParentSize()
@@ -564,6 +574,10 @@ fun ServersScreen(
 private fun ServersHeader(
     state: ServersUiState,
     expired: Boolean,
+    /** The subscription's own doors — its site, its support — as the row's quiet icons. */
+    links: List<SubscriptionLink>,
+    /** The panel's own word, when it has one — the row's icon that says it on a tap. */
+    announcement: String?,
     /**
      * The half-light the fold and the menus lay over the header — laid per chip here,
      * not over the whole row: the chip whose own menu stands keeps its full paint, the
@@ -585,6 +599,19 @@ private fun ServersHeader(
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        // The subscription's doors lead the row: the site and the support as bare
+        // icons, their names a long press away.
+        links.forEach { link ->
+            Box(Modifier.graphicsLayer { this.alpha = alpha }) {
+                SubscriptionLinkChip(link)
+            }
+        }
+        // The panel's own word follows them, said on a tap.
+        announcement?.let { text ->
+            Box(Modifier.graphicsLayer { this.alpha = alpha }) {
+                SubscriptionAnnouncementChip(text)
+            }
+        }
         if (state.profiles.isNotEmpty()) {
             Box(Modifier.graphicsLayer { this.alpha = alpha }) {
                 InfoChip(
@@ -677,59 +704,90 @@ private fun ServersHeader(
  */
 private val LocalSubscriptionUpdateFocus = androidx.compose.runtime.staticCompositionLocalOf<FocusRequester?> { null }
 
+/**
+ * The panel's own word, out of the card and into the row's icons: a tap stands the
+ * announcement up over the chip — the same note-over-the-row the delete ask wears —
+ * and the next tap folds it back. No timer here: a paragraph is read at its own pace.
+ */
 @Composable
-private fun SubscriptionDetails(subscription: SubscriptionEntity, supportingColor: Color) {
-    if (subscription.announcement == null && subscription.supportUrl == null && subscription.webPageUrl == null) return
-
-    val hasLinks = subscription.webPageUrl != null || subscription.supportUrl != null
-    val gap = if (subscription.announcement != null && hasLinks) 8.dp else 0.dp
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(gap),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (hasLinks) {
-            subscription.webPageUrl?.let { url ->
-                SubscriptionLinkButton(url, R.drawable.ic_public, R.string.subscription_website)
-            } ?: Spacer(Modifier.width(48.dp))
-        }
-        val center = Modifier.weight(1f)
-        val announcement = subscription.announcement
-        if (announcement != null) {
+private fun SubscriptionAnnouncementChip(text: String) {
+    val poke = rememberHapticPoke()
+    var shown by remember { mutableStateOf(false) }
+    Box {
+        InfoChip(
+            value = "",
+            icon = R.drawable.ic_info,
+            description = stringResource(R.string.subscription_announcement),
+            onClick = {
+                poke()
+                shown = !shown
+            },
+        )
+        CardCallout(expanded = shown) {
             Text(
-                text = announcement,
-                color = supportingColor,
-                style = MaterialTheme.typography.bodyMedium.copy(lineBreak = LineBreak.Paragraph),
-                textAlign = TextAlign.Center,
-                modifier = center.controllerReadFocus(),
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .widthIn(max = 360.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
-        } else {
-            Spacer(center)
-        }
-        if (hasLinks) {
-            subscription.supportUrl?.let { url ->
-                SubscriptionLinkButton(url, R.drawable.ic_person, R.string.subscription_support)
-            } ?: Spacer(Modifier.width(48.dp))
         }
     }
 }
 
+/**
+ * One of the subscription's own doors — the panel's site, its support — as the chip
+ * row's quiet icon: a tap walks out through the browser, and a long press says what
+ * the door is, the same note-over-the-row the delete ask wears, standing on its own
+ * and fading away when it has said it. The glyph itself tells the familiar hosts
+ * apart: a Telegram one wears the plane.
+ */
 @Composable
-private fun SubscriptionLinkButton(url: String, icon: Int, description: Int) {
+private fun SubscriptionLinkChip(link: SubscriptionLink) {
     val context = LocalContext.current
-    val uri = remember(url) { url.toUri() }
+    val poke = rememberHapticPoke()
+    val uri = remember(link.url) { link.url.toUri() }
     val glyph = when (uri.host?.lowercase()) {
         "t.me", "telegram.me", "telegram.dog", "www.t.me", "www.telegram.me", "www.telegram.dog" -> R.drawable.ic_telegram
-        else -> icon
+        else -> link.icon
     }
-    FilledTonalIconButton(
-        onClick = { context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) } },
-        modifier = Modifier.size(48.dp).focusRing(circular = true, inset = true, gap = 1.dp),
-        shape = CircleShape,
-    ) {
-        Icon(painterResource(glyph), contentDescription = stringResource(description))
+    val label = stringResource(link.label)
+    var labelShown by remember { mutableStateOf(false) }
+    LaunchedEffect(labelShown) {
+        if (labelShown) {
+            delay(LINK_NOTE_MILLIS)
+            labelShown = false
+        }
+    }
+    Box {
+        InfoChip(
+            value = "",
+            icon = glyph,
+            description = label,
+            onClick = {
+                labelShown = false
+                context.externalAction { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+            },
+            onLongClick = {
+                poke()
+                labelShown = true
+            },
+        )
+        CardCallout(expanded = labelShown) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
     }
 }
+
+/** A link door out of the subscription card: where it goes, what it wears, what it's called. */
+private data class SubscriptionLink(val url: String, val icon: Int, val label: Int)
+
+/** How long a link chip's note stands before it fades away on its own. */
+private const val LINK_NOTE_MILLIS = 2_500L
 
 @Composable
 private fun SubscriptionCard(
@@ -855,7 +913,6 @@ private fun SubscriptionCard(
                                 )
                             }
                         }
-                        if (sub != null) SubscriptionDetails(sub, supportingColor)
                     }
                 }
             }
@@ -2203,6 +2260,10 @@ private fun ServerGroupRow(
     menuAskingDelete: Boolean,
     onMenuAskingChange: (Boolean) -> Unit,
     onCopyText: (String) -> Unit,
+    /** The running sweep's start, or null — the stamp the row's old answer wears struck through. */
+    pingSweepStart: Long?,
+    /** The profiles a single ask is measuring right now — their rows wear the strike too. */
+    pingingIds: Set<String> = emptySet(),
     /** The fold's half-light over the rows, read at draw time — see [ServerRow]. */
     foldDim: () -> Float,
 ) {
@@ -2261,10 +2322,17 @@ private fun ServerGroupRow(
             canHide = true,
             concealed = profile.concealed,
             onToggleConcealed = { onToggleConcealed(profile.id, it) },
+            // The ping's own door in the menu, the row's one way to ask for a
+            // fresh number: concealed rows keep it shut, as they keep every
+            // other way of asking.
+            canPing = !profile.concealed,
+            onPing = { onPingServer(profile.id) },
         ) else null,
         dimmed = menuHost != null && menuHost != profile.id,
         shape = shape,
         foldDim = foldDim,
+        pingSweepStart = pingSweepStart,
+        pingingIds = pingingIds,
     )
 }
 
@@ -2300,7 +2368,7 @@ private fun ServersEmpty() {
  * line, the last real ping after the name — the accent from [HIGH_PING_MILLIS] on — and the
  * spinning cookie marking the pick. Selectable at any time, tunnel or not; a tap that lands
  * while the tunnel is up swaps the server in place. A long press opens the row's own menu —
- * the pin, the link, the delete — and a pinned row wears the pin itself, stuck through its
+ * the pin, the ping, the link, the delete — and a pinned row wears the pin itself, stuck through its
  * top-right corner at its own angle.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -2318,6 +2386,10 @@ private fun ServerRow(
     menu: RowMenu?,
     dimmed: Boolean,
     shape: Shape,
+    /** The running sweep's start, or null — the stamp the row's old answer wears struck through. */
+    pingSweepStart: Long? = null,
+    /** The profiles a single ask is measuring right now — their rows wear the strike too. */
+    pingingIds: Set<String> = emptySet(),
     // The fold's half-light over the list, read in the row's layers at draw time so
     // the fold's frames never recompose it. The row dims itself in pieces — the card
     // here, the pin below — instead of one group over the whole row: a grouped layer
@@ -2391,6 +2463,15 @@ private fun ServerRow(
     val poke = rememberHapticPoke()
     val displayedDelay = profile.testDelayMillis?.takeIf { it >= 0 }
     val hasPingResult = displayedDelay != null || profile.lastTestAt != null
+    // A sweep's stamp marks the old answers: while it runs, every number older than
+    // the stamp wears the strike — the sweep is asking again, and the struck number
+    // is the last answer that still stands. The row's own fresh answer lands past
+    // the stamp and the strike comes off it. A single ask (a menu ping, a balancer's
+    // targeted sweep) strikes its own row the same way, so the ask is never mistaken
+    // for being ignored.
+    val crossed = profile.id in pingingIds ||
+        (pingSweepStart != null && (profile.lastTestAt ?: 0L) < pingSweepStart)
+    val strike = if (crossed) TextDecoration.LineThrough else null
     val resultPoke = rememberHapticSoftPoke()
     var measured by remember(profile.id) { mutableStateOf(false) }
     LaunchedEffect(profile.id, displayedDelay, hasPingResult) {
@@ -2399,44 +2480,7 @@ private fun ServerRow(
     }
 
     val canPing = !profile.concealed
-    val swipeEnabled = canPing && !dimmed && menu?.open != true &&
-        LocalInputMode.current != InputMode.CONTROLLER
     val pingLabel = stringResource(R.string.server_ping_action)
-    val latestPing by rememberUpdatedState(onPing)
-    val swipeOffset = remember(profile.id) { mutableFloatStateOf(0f) }
-    val swipeVisible by remember(swipeOffset) { derivedStateOf { swipeOffset.floatValue > 0f } }
-    val swipeScope = rememberCoroutineScope()
-    val swipe = if (swipeEnabled) Modifier.pointerInput(profile.id) {
-        val reveal = 72.dp.toPx()
-        var settle: kotlinx.coroutines.Job? = null
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            val start = awaitHorizontalTouchSlopOrCancellation(down.id) { change, delta ->
-                if (delta > 0f) {
-                    settle?.cancel()
-                    swipeOffset.floatValue = delta.coerceAtMost(reveal)
-                    change.consume()
-                }
-            } ?: return@awaitEachGesture
-            try {
-                val completed = horizontalDrag(start.id) { change ->
-                    swipeOffset.floatValue = (swipeOffset.floatValue +
-                        change.position.x - change.previousPosition.x).coerceIn(0f, reveal)
-                    change.consume()
-                }
-                if (completed && swipeOffset.floatValue >= reveal * 0.75f) latestPing()
-            } finally {
-                settle = swipeScope.launch {
-                    animate(swipeOffset.floatValue, 0f) { value, _ ->
-                        swipeOffset.floatValue = value
-                    }
-                }
-            }
-        }
-    } else Modifier
-    LaunchedEffect(swipeEnabled) {
-        if (!swipeEnabled) swipeOffset.floatValue = 0f
-    }
 
     // The row's own frame, clipping to nothing: every Surface clips to its shape,
     // and the pin rides the top-right corner half over the edge — so the pin stands
@@ -2445,32 +2489,14 @@ private fun ServerRow(
     // the row and shear the pin off at the card's edge. The dim rides the card and
     // the pin each in their own layer instead, so the one follows the other into
     // the half-light without losing the pin's overhang.
-    Box(
-        modifier = Modifier.fillMaxWidth().then(swipe)
-            .then(if (swipeVisible) Modifier.clipToBounds() else Modifier),
-    ) {
-        if (swipeVisible) {
-            Box(Modifier.matchParentSize().clip(shape)) {
-                Box(
-                    modifier = Modifier.width(72.dp).fillMaxHeight()
-                        .graphicsLayer { translationX = swipeOffset.floatValue - size.width }
-                        .background(colors.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(painterResource(R.drawable.ic_speed_normal), null, tint = colors.onPrimaryContainer)
-                }
-            }
-        }
+    Box(modifier = Modifier.fillMaxWidth()) {
         Surface(
             shape = shape,
             color = containerColor,
             contentColor = contentColor,
             modifier = Modifier
                 .fillMaxWidth()
-                .graphicsLayer {
-                    alpha = dim * foldDim()
-                    translationX = swipeOffset.floatValue
-                },
+                .graphicsLayer { alpha = dim * foldDim() },
         ) {
             // The row's body laid out by hand, to ListItem's own drawing — the M3
             // component carries a colors machine and a defaults table every row paid
@@ -2572,10 +2598,17 @@ private fun ServerRow(
                         run {
                             if (LocalUiSettings.current.simpleTransitions) {
                                 if (hasPingResult) {
+                                    val value = displayedDelay?.let {
+                                        stringResource(R.string.servers_ping_ms, it.toInt())
+                                    } ?: stringResource(R.string.servers_offline)
+                                    // The strike wears the value alone: the separator is
+                                    // the row's own punctuation, and punctuation doesn't
+                                    // answer to the sweep.
                                     Text(
-                                        text = "  ·  " + (displayedDelay?.let {
-                                            stringResource(R.string.servers_ping_ms, it.toInt())
-                                        } ?: stringResource(R.string.servers_offline)),
+                                        text = buildAnnotatedString {
+                                            append("  ·  ")
+                                            withStyle(SpanStyle(textDecoration = strike)) { append(value) }
+                                        },
                                         color = extraColor,
                                         maxLines = 1,
                                     )
@@ -2595,7 +2628,10 @@ private fun ServerRow(
                                             stringResource(R.string.servers_ping_ms, it.toInt())
                                         } ?: stringResource(R.string.servers_offline)
                                         Text(
-                                            text = "  ·  $text",
+                                            text = buildAnnotatedString {
+                                                append("  ·  ")
+                                                withStyle(SpanStyle(textDecoration = strike)) { append(text) }
+                                            },
                                             color = extraColor,
                                             maxLines = 1,
                                         )
@@ -2664,6 +2700,8 @@ private fun ServerRow(
                 canHide = rowMenu.canHide,
                 concealed = rowMenu.concealed,
                 onToggleConcealed = rowMenu.onToggleConcealed,
+                canPing = rowMenu.canPing,
+                onPing = rowMenu.onPing,
             )
         }
         // The pin's mark: a pinned row wears the pin itself, stuck through the card's
@@ -2748,12 +2786,16 @@ private class RowMenu(
     val canHide: Boolean = false,
     val concealed: Boolean = false,
     val onToggleConcealed: (Boolean) -> Unit = {},
+    /** The ping's own door — the row's one way to ask for a fresh number. */
+    val canPing: Boolean = false,
+    val onPing: () -> Unit = {},
 )
 
 /**
  * The row menu itself: the stock dropdown in its stock clothes. Its first face is the
- * asks — the pin (a live one: pinning a row carries it to the head of its list, and
- * the door says so), the copy of whatever the row was born from (dim when there is
+ * asks — the ping (the row's one way to ask for a fresh number), the pin (a live one:
+ * pinning a row carries it to the head of its list, and the door says so), the copy of
+ * whatever the row was born from (dim when there is
  * nothing behind it to copy), and the delete, the one door that wears red. The delete
  * does not delete: it trades the menu's face for the ask — Да in red over Нет, the way
  * back — while the question itself rides above the row, in the callout. Rows that
@@ -2777,6 +2819,8 @@ private fun CardActionsMenu(
     canHide: Boolean = false,
     concealed: Boolean = false,
     onToggleConcealed: (Boolean) -> Unit = {},
+    canPing: Boolean = false,
+    onPing: () -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
@@ -2850,6 +2894,19 @@ private fun CardActionsMenu(
                 }
             } else {
                 Column {
+                    if (canPing) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.card_menu_ping)) },
+                            onClick = {
+                                onClose()
+                                poke()
+                                onPing()
+                            },
+                            leadingIcon = {
+                                Icon(painterResource(R.drawable.ic_speed_normal), contentDescription = null)
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = {
                             Text(

@@ -76,6 +76,7 @@
     <string name="config_delete_title">Удалить этот конфиг?</string>
     <string name="subscription_delete_title">Удалить эту подписку?</string>
     <string name="card_menu_pin">Закрепить</string>
+    <string name="card_menu_ping">Ping</string>
     <string name="card_menu_unpin">Открепить</string>
     <string name="card_menu_pinned">Закреплён</string>
     <string name="card_menu_hide">Скрыть</string>
@@ -335,6 +336,7 @@
     <string name="local_network_permission_required">Разрешите доступ к устройствам поблизости, чтобы принимать файлы с телефона.</string>
     <string name="subscription_support">Поддержка</string>
     <string name="subscription_website">Сайт подписки</string>
+    <string name="subscription_announcement">Анонс подписки</string>
     <string name="server_ping_action">Проверить пинг сервера</string>
     <string name="tunnel_error_port_busy">Локальный порт занят. Закройте другие VPN или прокси-приложения и попробуйте снова.</string>
     <string name="tunnel_error_geodata">Не удалось загрузить базы маршрутизации. Обновите подписку и попробуйте снова.</string>

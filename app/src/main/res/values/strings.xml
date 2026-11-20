@@ -76,6 +76,7 @@
     <string name="config_delete_title">Delete this config?</string>
     <string name="subscription_delete_title">Delete this subscription?</string>
     <string name="card_menu_pin">Pin</string>
+    <string name="card_menu_ping">Ping</string>
     <string name="card_menu_unpin">Unpin</string>
     <string name="card_menu_pinned">Pinned</string>
     <string name="card_menu_hide">Hide</string>
@@ -339,6 +340,7 @@
     <string name="local_network_permission_required">Allow access to nearby devices to receive files from your phone.</string>
     <string name="subscription_support">Support</string>
     <string name="subscription_website">Subscription website</string>
+    <string name="subscription_announcement">Subscription announcement</string>
     <string name="server_ping_action">Check server latency</string>
     <string name="tunnel_error_port_busy">A local port is busy. Close any other VPN or proxy app and try again.</string>
     <string name="tunnel_error_geodata">Couldn\'t load the routing databases. Refresh the subscription and try again.</string>

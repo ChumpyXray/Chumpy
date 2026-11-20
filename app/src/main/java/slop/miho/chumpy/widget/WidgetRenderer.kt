@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.Layout
@@ -20,8 +21,9 @@ import slop.miho.chumpy.ui.theme.OrbWidgetColors
 import kotlin.math.max
 
 /**
- * What the orb says in its middle: the flag the panel put on the name (or the globe when
- * there is none), the region's own name, and the subscription's — a touch smaller.
+ * What the orb says: the flag the panel put on the name (or the globe when there
+ * is none) alone in its middle, the region's own name bent along the rim, and the
+ * subscription's — a touch smaller, climbing the other side.
  */
 data class WidgetFace(
     val flag: String?,
@@ -60,6 +62,19 @@ object WidgetRenderer {
 
     /** How many pin tiles the layout carves room for; the provider may fill fewer. */
     const val PIN_SLOTS = 3
+
+    /**
+     * The rim texts' anchors and reach, in screen degrees off the orb's middle
+     * (0 = right, 90 bottom). The region ends just left of the bottom and
+     * bends up the left side — never crossing under the connect button, and
+     * stopping short of the pin row above; the subscription starts just above
+     * the button's shoulder and climbs the right side until the pins crowd it
+     * from the top-left.
+     */
+    private const val REGION_ANCHOR = 96f
+    private const val REGION_SWEEP = 110f
+    private const val SUB_ANCHOR = 14f
+    private const val SUB_SWEEP = 56f
 
     @Volatile
     private var inter: Typeface? = null
@@ -110,49 +125,43 @@ object WidgetRenderer {
         // ---- the orb ------------------------------------------------------------
         canvas.drawCircle(cx, cy, radius, fillPaint(fill))
 
-        // ---- the middle: subscription, region, flag -----------------------------
-        val flagBox = short * 0.30f
-        val regionSize = short * 0.10f
-        val subSize = short * 0.074f
+        // ---- the middle: the flag alone, a touch bigger than the stack it
+        //      used to share --------------------------------------------------------
+        val flagBox = short * 0.33f
         val flagLayout = flagLayout(context, face.flag, flagStyle, flagBox * 0.85f)
-        val regionLayout = textLayout(
-            context, face.region, regionSize, content, bold = true, width = short * 0.62f,
-        )
-        val subLayout = face.subscription?.takeIf { it.isNotBlank() }?.let {
-            textLayout(
-                context,
-                it,
-                subSize,
-                ColorUtils.setAlphaComponent(content, 185),
-                bold = false,
-                width = short * 0.70f,
-            )
-        }
-        val gap = short * 0.025f
-        val total = (flagLayout?.height ?: flagBox.toInt()) + gap + regionLayout.height +
-            (subLayout?.let { gap * 0.7f + it.height } ?: 0f)
-        // A touch below the mathematical middle: the pin row crowds the top edge, so
-        // the stack — the subscription first of all — settles a little lower and breathes.
-        var top = cy - total / 2f + short * 0.015f
-        subLayout?.let {
-            canvas.save()
-            canvas.translate(cx - it.width / 2f, top)
-            it.draw(canvas)
-            canvas.restore()
-            top += it.height + gap * 0.7f
-        }
-        canvas.save()
-        canvas.translate(cx - regionLayout.width / 2f, top)
-        regionLayout.draw(canvas)
-        canvas.restore()
-        top += regionLayout.height + gap
         if (flagLayout != null) {
             canvas.save()
-            canvas.translate(cx - flagLayout.width / 2f, top)
+            canvas.translate(cx - flagLayout.width / 2f, cy - flagLayout.height / 2f)
             flagLayout.draw(canvas)
             canvas.restore()
         } else {
-            drawVector(context, R.drawable.ic_public, content, canvas, cx, top + flagBox / 2f, flagBox)
+            drawVector(context, R.drawable.ic_public, content, canvas, cx, cy, flagBox)
+        }
+
+        // ---- the rim: the region bends along the circle's edge down the
+        //      bottom-left, curving with it so long names fit inside; the
+        //      subscription climbs the right side from just above the
+        //      button's shoulder, where the button leaves it less room ------
+        val rim = radius * 0.92f
+        drawRimText(
+            canvas, context, face.region, cx, cy, rim,
+            size = short * 0.10f,
+            color = content,
+            bold = true,
+            anchorDeg = REGION_ANCHOR,
+            maxSweepDeg = REGION_SWEEP,
+            anchorEnd = true,
+        )
+        face.subscription?.let { sub ->
+            drawRimText(
+                canvas, context, sub, cx, cy, rim,
+                size = short * 0.074f,
+                color = ColorUtils.setAlphaComponent(content, 185),
+                bold = false,
+                anchorDeg = SUB_ANCHOR,
+                maxSweepDeg = SUB_SWEEP,
+                anchorEnd = false,
+            )
         }
 
         // ---- the connect button: size tied to the orb alone, box flush in the orb
@@ -314,16 +323,34 @@ object WidgetRenderer {
             .build()
     }
 
-    // --------------------------------------------------------------- region text
+    // --------------------------------------------------------------- rim text
 
-    private fun textLayout(
+    /**
+     * One line bent along the orb's rim — the badge way to fit words beside the
+     * circle's own roundness. The glyphs stand with their tops toward the middle
+     * and the baseline riding [radius]; the line grows from [anchorDeg] (screen
+     * degrees: 0 right, 90 bottom) and bends no further than [maxSweepDeg],
+     * ellipsizing past that. [anchorEnd] pins the line's last glyph at the
+     * anchor — the region, reading down into the bottom; otherwise the first
+     * glyph sits there and the line climbs away from it — the subscription,
+     * dodging the connect button.
+     */
+    private fun drawRimText(
+        canvas: Canvas,
         context: Context,
         text: String,
+        cx: Float,
+        cy: Float,
+        radius: Float,
         size: Float,
         color: Int,
         bold: Boolean,
-        width: Float,
-    ): StaticLayout {
+        anchorDeg: Float,
+        maxSweepDeg: Float,
+        anchorEnd: Boolean,
+    ) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() || radius <= 0f || maxSweepDeg <= 0f) return
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
         paint.color = color
         paint.textSize = size
@@ -332,11 +359,17 @@ object WidgetRenderer {
             if (bold) runCatching { paint.fontVariationSettings = "'wght' 650" }
         }
         if (bold && paint.typeface == null) paint.isFakeBoldText = true
-        val shown = TextUtils.ellipsize(text, paint, width, TextUtils.TruncateAt.END) as String
-        return StaticLayout.Builder
-            .obtain(shown, 0, shown.length, paint, width.toInt().coerceAtLeast(1))
-            .setAlignment(Layout.Alignment.ALIGN_CENTER)
-            .build()
+        val avail = Math.toRadians(maxSweepDeg.toDouble()).toFloat() * radius
+        val shown = TextUtils.ellipsize(trimmed, paint, avail, TextUtils.TruncateAt.END) as String
+        if (shown.isEmpty()) return
+        val sweepDeg = Math.toDegrees((paint.measureText(shown) / radius).toDouble()).toFloat()
+        // The path runs the reading direction: toward the anchor for the region,
+        // away upward for the subscription — a negative sweep walks the rim
+        // counterclockwise, the way both lines read.
+        val startDeg = if (anchorEnd) anchorDeg + sweepDeg else anchorDeg
+        val path = Path()
+        path.addArc(RectF(cx - radius, cy - radius, cx + radius, cy + radius), startDeg, -sweepDeg)
+        canvas.drawTextOnPath(shown, path, 0f, 0f, paint)
     }
 
     // --------------------------------------------------------------- plumbing
