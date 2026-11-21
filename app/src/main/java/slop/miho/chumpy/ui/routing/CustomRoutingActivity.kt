@@ -207,16 +207,13 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(slop.miho.chumpy.R.string.custom_routing_title), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_chain_hint), style = MaterialTheme.typography.bodyMedium)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(slop.miho.chumpy.R.string.custom_routing_enabled), style = MaterialTheme.typography.bodyLarge)
-                Text(stringResource(slop.miho.chumpy.R.string.custom_routing_only_chain), style = MaterialTheme.typography.bodyMedium)
             }
             Switch(value.enabled, onCheckedChange = { onChange(value.copy(enabled = it)) })
         }
         Text(stringResource(slop.miho.chumpy.R.string.custom_routing_order), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_last_stage_fallback), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         value.stageOrder.forEachIndexed { index, stage ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stageLabel(stage), modifier = Modifier.weight(1f))
@@ -250,8 +247,6 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
             onQueryPrefix = { prefix -> maybeLoadCatalog(prefix, value, geositeCategories, geoipCategories, automaticCatalogRequests, { automaticCatalogRequests = it }, ::loadCategories) },
             onChange = { onChange(value.copy(proxy = it)) },
         )
-        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_sources_hint), style = MaterialTheme.typography.bodyMedium)
-        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_trim_hint), style = MaterialTheme.typography.bodySmall)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             geodataPresets.forEach { preset ->
                 FilterChip(
@@ -279,6 +274,10 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
             Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geosite), modifier = Modifier.weight(1f))
             Switch(value.customGeosite, onCheckedChange = { onChange(value.copy(customGeosite = it)) })
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geoip), modifier = Modifier.weight(1f))
+            Switch(value.customGeoip, onCheckedChange = { onChange(value.copy(customGeoip = it)) })
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(enabled = !importing, onClick = { importGeoip = false; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
                 Text(stringResource(if (value.customGeosite) slop.miho.chumpy.R.string.custom_routing_replace_geosite else slop.miho.chumpy.R.string.custom_routing_import_geosite))
@@ -287,11 +286,6 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
                 Text(stringResource(if (value.customGeoip) slop.miho.chumpy.R.string.custom_routing_replace_geoip else slop.miho.chumpy.R.string.custom_routing_import_geoip))
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geoip), modifier = Modifier.weight(1f))
-            Switch(value.customGeoip, onCheckedChange = { onChange(value.copy(customGeoip = it)) })
-        }
-        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_file_hint), style = MaterialTheme.typography.bodySmall)
         notice?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }

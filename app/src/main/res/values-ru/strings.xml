@@ -6,7 +6,7 @@
     <string name="custom_routing_chain_hint">При включении эта цепочка заменяет региональные пресеты и правила подписки.</string>
     <string name="custom_routing_enabled">Включить свои правила</string>
     <string name="custom_routing_only_chain">Используется только эта цепочка</string>
-    <string name="custom_routing_order">Порядок правил (сверху — приоритетнее)</string>
+    <string name="custom_routing_order">Порядок правил</string>
     <string name="custom_routing_last_stage_fallback">Если совпадений нет, используется последняя стадия.</string>
     <string name="custom_routing_sources_hint">Выберите готовый источник или укажите HTTPS-ссылку. Источники используются для правил geosite: и geoip:.</string>
     <string name="custom_routing_trim_hint">Полные файлы хранятся для подсказок категорий; перед запуском остаются только выбранные категории.</string>

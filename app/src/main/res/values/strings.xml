@@ -175,7 +175,7 @@
     <string name="custom_routing_chain_hint">When enabled, this chain replaces regional presets and panel routing.</string>
     <string name="custom_routing_enabled">Enable custom rules</string>
     <string name="custom_routing_only_chain">Only this rule chain is used</string>
-    <string name="custom_routing_order">Rule order (first match wins)</string>
+    <string name="custom_routing_order">Rule order</string>
     <string name="custom_routing_last_stage_fallback">Unmatched traffic uses the last stage as its fallback.</string>
     <string name="custom_routing_sources_hint">Choose a ready-made source or enter your own HTTPS URL. Sources are used for geosite: and geoip: rules.</string>
     <string name="custom_routing_trim_hint">Full files are cached for category suggestions; only selected categories are prepared for the running tunnel.</string>
