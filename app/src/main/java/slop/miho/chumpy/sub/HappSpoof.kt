@@ -43,6 +43,8 @@ object HappSpoof {
         val userId: String,
         val hwid: String,
         val incy: Boolean = false,
+        val sendHwid: Boolean = true,
+        val userAgentOverride: String? = null,
     )
 
     /** A 20-digit user id, the shape Happ's own ids carry. */
@@ -78,6 +80,7 @@ object HappSpoof {
             locale = happLocale.ifBlank { DEFAULT_LOCALE },
             userId = happUserId.ifBlank { randomUserId() },
             hwid = happHwid.ifBlank { randomHwid() },
+            sendHwid = happSendHwid,
         )
     }
 
@@ -86,15 +89,56 @@ object HappSpoof {
      * Chumpy and its build version, and ends with the existing client identifier.
      */
     fun headers(fingerprint: Fingerprint): Map<String, String> = mapOf(
-        "User-Agent" to "${if (fingerprint.incy) "INCY" else "Happ"}/${fingerprint.appVersion}/${fingerprint.os}/Chumpy/${BuildConfig.VERSION_NAME}/${fingerprint.userId}",
+        "User-Agent" to (fingerprint.userAgentOverride?.takeIf { it.isNotBlank() }
+            ?: "${if (fingerprint.incy) "INCY" else "Happ"}/${fingerprint.appVersion}/${fingerprint.os}/Chumpy/${BuildConfig.VERSION_NAME}/${fingerprint.userId}"),
         "x-device-locale" to fingerprint.locale,
-        "x-hwid" to fingerprint.hwid,
         "x-device-os" to fingerprint.os,
         "x-ver-os" to fingerprint.osVersion,
         "x-device-model" to fingerprint.deviceModel,
         "accept-encoding" to "gzip",
     ).let { headers ->
-        if (fingerprint.incy) headers + ("X-Device-ID" to fingerprint.hwid) else headers
+        if (!fingerprint.sendHwid) headers - "x-hwid"
+        else if (fingerprint.incy) headers + ("X-Device-ID" to fingerprint.hwid)
+        else headers + ("x-hwid" to fingerprint.hwid)
+    }
+
+    /** Applies one subscription's tri-state overrides over the global identity. */
+    fun override(
+        global: Fingerprint?,
+        settings: slop.miho.chumpy.db.SubscriptionRequestSettings,
+    ): Fingerprint? {
+        val hasOverrides = settings.spoofMode != null || settings.appVersion != null || settings.userId != null ||
+            settings.hwid != null || settings.os != null || settings.osVersion != null ||
+            settings.deviceModel != null || settings.locale != null
+        if (global == null && !hasOverrides) return null
+        val mode = settings.spoofMode ?: if (global?.incy == true) SpoofMode.INCY else SpoofMode.HAPP
+        if (mode == SpoofMode.OFF) return null
+        val base = global ?: Fingerprint(
+            appVersion = if (mode == SpoofMode.INCY) DEFAULT_INCY_APP_VERSION else DEFAULT_APP_VERSION,
+            os = DEFAULT_OS,
+            osVersion = defaultOsVersion(),
+            deviceModel = defaultDeviceModel(),
+            locale = DEFAULT_LOCALE,
+            userId = randomUserId(),
+            hwid = randomHwid(),
+            incy = mode == SpoofMode.INCY,
+        )
+        val incy = mode == SpoofMode.INCY
+        return base.copy(
+            appVersion = settings.appVersion?.takeIf { it.isNotBlank() }
+                ?: if (incy != base.incy) {
+                    if (incy) DEFAULT_INCY_APP_VERSION else DEFAULT_APP_VERSION
+                } else base.appVersion,
+            incy = incy,
+            userId = settings.userId?.takeIf { it.isNotBlank() } ?: base.userId,
+            hwid = settings.hwid?.takeIf { it.isNotBlank() } ?: base.hwid,
+            os = settings.os?.takeIf { it.isNotBlank() } ?: base.os,
+            osVersion = settings.osVersion?.takeIf { it.isNotBlank() } ?: base.osVersion,
+            deviceModel = settings.deviceModel?.takeIf { it.isNotBlank() } ?: base.deviceModel,
+            locale = settings.locale?.takeIf { it.isNotBlank() } ?: base.locale,
+            sendHwid = settings.sendHwid ?: base.sendHwid,
+            userAgentOverride = settings.userAgent?.takeIf { it.isNotBlank() },
+        )
     }
 
     fun apply(connection: HttpURLConnection, fingerprint: Fingerprint) {

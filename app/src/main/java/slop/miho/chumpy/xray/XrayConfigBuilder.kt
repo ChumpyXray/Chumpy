@@ -8,6 +8,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import slop.miho.chumpy.data.CustomRouting
+import slop.miho.chumpy.data.CustomRouteStage
 import slop.miho.chumpy.db.ProfileEntity
 import slop.miho.chumpy.db.ProfileType
 
@@ -85,6 +87,7 @@ object XrayConfigBuilder {
         mode: RoutingMode,
         members: List<ProfileEntity> = emptyList(),
         testUrl: String = DEFAULT_TEST_URL,
+        customRouting: CustomRouting = CustomRouting(),
     ): String {
         require(profile.type != ProfileType.BALANCER || members.isNotEmpty()) { "Balancer has no usable servers" }
         val balancerMembers = if (profile.type == ProfileType.BALANCER) members else emptyList()
@@ -189,6 +192,7 @@ object XrayConfigBuilder {
                 strategy = strategy,
                 profileRules = if (mode == RoutingMode.GLOBAL) profile.routingRules else "",
                 geodataSources = profile.geodataSources,
+                customRouting = customRouting,
             )
         )
         if (strategy in OBSERVING_STRATEGIES && balancerMembers.isNotEmpty()) {
@@ -266,12 +270,70 @@ object XrayConfigBuilder {
         )
     }
 
+    /** A bare IPv4 address or CIDR, the only shape a dotted entry may take. */
+    private val ipv4Entry = Regex("""^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$""")
+
+    /** A bare IPv6 address or CIDR: hex digits, dots, colons, and an optional prefix. */
+    private val ipv6Entry = Regex("""^[0-9A-Fa-f:.]+(/\d{1,3})?$""")
+
+    /**
+     * The user's own lists as routing rules: one domain rule and one IP rule per action,
+     * each carrying the entries that belong to it. Entries keep the core's own spellings
+     * (`geosite:`, `geoip:`, `domain:`, `full:`, `ext:`) and a bare value is read as a
+     * domain unless it is an address — `example.com` becomes `domain:example.com`.
+     */
+    private fun customRouteRules(
+        entries: List<String>,
+        outbound: String?,
+        balancer: String? = null,
+    ): List<JsonObject> {
+        if (entries.isEmpty()) return emptyList()
+        val domains = mutableListOf<String>()
+        val ips = mutableListOf<String>()
+        entries.map(String::trim).filter(String::isNotEmpty).forEach { entry ->
+            when {
+                entry.startsWith("geoip:", ignoreCase = true) -> ips += entry
+                entry.startsWith("geosite:", ignoreCase = true) -> domains += entry
+                entry.startsWith("ext:", ignoreCase = true) -> {
+                    val file = entry.removePrefix("ext:").substringBefore(':')
+                    if (file.contains("geoip", ignoreCase = true)) ips += entry else domains += entry
+                }
+                entry.startsWith("domain:", ignoreCase = true) ||
+                    entry.startsWith("full:", ignoreCase = true) ||
+                    entry.startsWith("regexp:", ignoreCase = true) ||
+                    entry.startsWith("keyword:", ignoreCase = true) ||
+                    entry.startsWith("dotless:", ignoreCase = true) -> domains += entry
+                isIpEntry(entry) -> ips += entry
+                else -> domains += "domain:$entry"
+            }
+        }
+        return buildList {
+            if (domains.isNotEmpty()) add(customRule("domain", domains.distinct(), outbound, balancer))
+            if (ips.isNotEmpty()) add(customRule("ip", ips.distinct(), outbound, balancer))
+        }
+    }
+
+    private fun customRule(
+        field: String,
+        values: List<String>,
+        outbound: String?,
+        balancer: String?,
+    ): JsonObject = buildJsonObject {
+        put("type", "field")
+        put(field, buildJsonArray { values.forEach { add(JsonPrimitive(it)) } })
+        if (balancer != null) put("balancerTag", balancer) else outbound?.let { put("outboundTag", it) }
+    }
+
+    private fun isIpEntry(entry: String): Boolean =
+        ipv4Entry.matches(entry) || (entry.contains(':') && ipv6Entry.matches(entry))
+
     private fun routing(
         mode: RoutingMode,
         balanced: Boolean,
         strategy: String,
         profileRules: String,
         geodataSources: String,
+        customRouting: CustomRouting,
     ) = buildJsonObject {
         put("domainStrategy", "AsIs")
         if (balanced) {
@@ -293,6 +355,35 @@ object XrayConfigBuilder {
         put(
             "rules",
             buildJsonArray {
+                if (customRouting.enabled) {
+                    // Custom routing is exclusive: it owns the entire rule chain, with
+                    // no hidden region, QUIC, private, or panel rules mixed in.
+                    customRouting.stageOrder.forEach { stage ->
+                        val entries = when (stage) {
+                            CustomRouteStage.BLOCKED -> customRouting.blocked
+                            CustomRouteStage.DIRECT -> customRouting.direct
+                            CustomRouteStage.PROXY -> customRouting.proxy
+                        }
+                        customRouteRules(
+                            entries,
+                            outbound = when (stage) {
+                                CustomRouteStage.BLOCKED -> BLOCK_TAG
+                                CustomRouteStage.DIRECT -> DIRECT_TAG
+                                CustomRouteStage.PROXY -> if (balanced) null else PROXY_TAG
+                            },
+                            balancer = BALANCER_TAG.takeIf { balanced && stage == CustomRouteStage.PROXY },
+                        ).forEach { add(it) }
+                    }
+                    rule {
+                        put("network", "tcp,udp")
+                        when (customRouting.stageOrder.lastOrNull() ?: CustomRouteStage.PROXY) {
+                            CustomRouteStage.BLOCKED -> put("outboundTag", BLOCK_TAG)
+                            CustomRouteStage.DIRECT -> put("outboundTag", DIRECT_TAG)
+                            CustomRouteStage.PROXY -> if (balanced) put("balancerTag", BALANCER_TAG)
+                                else put("outboundTag", PROXY_TAG)
+                        }
+                    }
+                } else {
                 mode.region?.let { region ->
                     // Sniffed BitTorrent goes direct in bypass mode, as in v2rayNG's presets.
                     rule {
@@ -345,6 +436,7 @@ object XrayConfigBuilder {
                         put("network", "tcp,udp")
                         put("balancerTag", BALANCER_TAG)
                     }
+                }
                 }
                 // Whatever matched nothing rides the first outbound: the proxy.
             },

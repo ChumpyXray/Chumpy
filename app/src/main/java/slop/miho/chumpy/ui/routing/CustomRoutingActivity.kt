@@ -1,0 +1,389 @@
+package slop.miho.chumpy.ui.routing
+
+import android.net.Uri
+import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import slop.miho.chumpy.data.ConnectionStore
+import slop.miho.chumpy.data.CustomRouting
+import slop.miho.chumpy.data.CustomRouteStage
+import slop.miho.chumpy.data.GeodataFiles
+import slop.miho.chumpy.Graph
+import slop.miho.chumpy.ui.components.ControllerActivity
+import slop.miho.chumpy.ui.theme.ChumpyTheme
+import java.io.File
+
+private enum class CategorySource { GEOSITE, GEOIP }
+
+private data class GeodataPreset(val name: String, val geosite: String, val geoip: String = "")
+
+private val geodataPresets = listOf(
+    GeodataPreset(
+        "v2fly/domain-list-community",
+        "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat",
+    ),
+    GeodataPreset(
+        "Chocolate4U/Iran-v2ray-rules",
+        "https://raw.githubusercontent.com/Chocolate4U/Iran-v2ray-rules/release/geosite.dat",
+        "https://raw.githubusercontent.com/Chocolate4U/Iran-v2ray-rules/release/geoip.dat",
+    ),
+    GeodataPreset(
+        "runetfreedom/russia-v2ray-rules-dat",
+        "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/geosite.dat",
+        "https://raw.githubusercontent.com/runetfreedom/russia-v2ray-rules-dat/release/geoip.dat",
+    ),
+)
+
+/** The custom domain/IP rules and the optional user-supplied Xray geodata databases. */
+class CustomRoutingActivity : ControllerActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        setContent {
+            val ui by slop.miho.chumpy.data.SettingsStore.settings(this).collectAsStateWithLifecycle()
+            val connection by ConnectionStore.settings(this).collectAsStateWithLifecycle()
+            ChumpyTheme(settings = ui) {
+                Surface(color = MaterialTheme.colorScheme.surface) {
+                    CustomRoutingScreen(
+                        value = connection.customRouting,
+                        onChange = { value -> ConnectionStore.update(this) { it.copy(customRouting = value) } },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var importing by remember { mutableStateOf(false) }
+    var automaticCatalogRequests by remember { mutableStateOf(emptySet<CategorySource>()) }
+    var importGeoip by remember { mutableStateOf(false) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var geositeCategories by remember { mutableStateOf(emptyList<String>()) }
+    var geoipCategories by remember { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(value.geositeUrl, value.geoipUrl, value.customGeosite, value.customGeoip) {
+        automaticCatalogRequests = emptySet()
+        geositeCategories = emptyList()
+        geoipCategories = emptyList()
+        val catalogs = withContext(Dispatchers.IO) {
+            fun load(url: String, custom: Boolean, customName: String, bundledName: String): List<String> {
+                return runCatching {
+                    if (custom) {
+                        val file = File(File(context.filesDir, "xray_assets"), customName)
+                        if (!file.isFile || file.length() !in 1..GeodataFiles.MAX_SOURCE_BYTES) return@runCatching emptyList()
+                        file.inputStream().use { GeodataFiles.categories(it, GeodataFiles.MAX_SOURCE_BYTES).toList().sorted() }
+                    } else if (url.isNotBlank()) {
+                        val file = GeodataFiles.catalogFile(context, url)
+                        if (!file.isFile || file.length() !in 1..GeodataFiles.MAX_SOURCE_BYTES) return@runCatching emptyList()
+                        file.inputStream().use { GeodataFiles.categories(it, GeodataFiles.MAX_SOURCE_BYTES).toList().sorted() }
+                    } else {
+                        context.assets.open(bundledName).use { GeodataFiles.categories(it, GeodataFiles.MAX_SOURCE_BYTES).toList().sorted() }
+                    }
+                }.getOrDefault(emptyList())
+            }
+            load(value.geositeUrl, value.customGeosite, GeodataFiles.USER_GEOSITE_FILE, "geosite.dat") to
+                load(value.geoipUrl, value.customGeoip, GeodataFiles.USER_GEOIP_FILE, "geoip.dat")
+        }
+        geositeCategories = catalogs.first
+        geoipCategories = catalogs.second
+    }
+    val categorySuggestionsGeo = geositeCategories
+    val categorySuggestionsIp = geoipCategories
+    fun loadCategories(source: CategorySource) {
+        if (importing) return
+        val url = if (source == CategorySource.GEOSITE) value.geositeUrl else value.geoipUrl
+        if (url.isBlank()) {
+            notice = "Set a geodata URL first"
+            return
+        }
+        scope.launch {
+            importing = true
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val target = GeodataFiles.catalogFile(context, url)
+                    val temporary = File.createTempFile("catalog-", ".part", target.parentFile)
+                    try {
+                        Graph.subscriptions.fetchCustomGeodataCatalog(url, temporary)
+                        val names = temporary.inputStream().use {
+                            GeodataFiles.categories(it, GeodataFiles.MAX_SOURCE_BYTES).toList().sorted()
+                        }
+                        target.delete()
+                        if (!temporary.renameTo(target)) error("Could not cache geodata catalog")
+                        names
+                    } finally {
+                        temporary.delete()
+                    }
+                }
+            }
+            importing = false
+            result.onSuccess { names ->
+                if (source == CategorySource.GEOSITE) geositeCategories = names else geoipCategories = names
+                notice = context.getString(slop.miho.chumpy.R.string.custom_routing_loaded_count, names.size)
+            }.onFailure { notice = it.message ?: "Could not load categories" }
+        }
+    }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            importing = true
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val directory = File(context.filesDir, "xray_assets").apply { mkdirs() }
+                    val name = if (importGeoip) GeodataFiles.USER_GEOIP_FILE else GeodataFiles.USER_GEOSITE_FILE
+                    val target = File(directory, name)
+                    val temporary = File(directory, "$name.part")
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        temporary.outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        var total = 0L
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            require(total <= GeodataFiles.MAX_SOURCE_BYTES) { "File must be under 512 MiB" }
+                            output.write(buffer, 0, count)
+                        }
+                        }
+                    } ?: error("Could not read file")
+                    require(temporary.length() > 0) { "Empty geodata file" }
+                    val categories = temporary.inputStream().use { GeodataFiles.categories(it, GeodataFiles.MAX_SOURCE_BYTES) }
+                    if (target.exists()) target.delete()
+                    if (!temporary.renameTo(target)) { temporary.delete(); error("Could not store geodata") }
+                    name to categories.toList().sorted()
+                }
+            }
+            importing = false
+            result.onSuccess { (filename, importedCategories) ->
+                onChange(if (filename == GeodataFiles.USER_GEOIP_FILE) value.copy(customGeoip = true) else value.copy(customGeosite = true))
+                if (filename == GeodataFiles.USER_GEOIP_FILE) geoipCategories = importedCategories else geositeCategories = importedCategories
+                notice = context.getString(slop.miho.chumpy.R.string.custom_routing_imported_count, importedCategories.size)
+            }.onFailure { notice = it.message ?: "Could not import geodata" }
+        }
+    }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
+            .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_title), style = MaterialTheme.typography.headlineSmall)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(slop.miho.chumpy.R.string.custom_routing_enabled), style = MaterialTheme.typography.bodyLarge)
+            }
+            Switch(value.enabled, onCheckedChange = { onChange(value.copy(enabled = it)) })
+        }
+        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_order), style = MaterialTheme.typography.titleMedium)
+        value.stageOrder.forEachIndexed { index, stage ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stageLabel(stage), modifier = Modifier.weight(1f))
+                Button(enabled = index > 0, onClick = {
+                    val order = value.stageOrder.toMutableList()
+                    java.util.Collections.swap(order, index, index - 1)
+                    onChange(value.copy(stageOrder = order))
+                }) { Text("↑") }
+                Button(enabled = index < value.stageOrder.lastIndex, onClick = {
+                    val order = value.stageOrder.toMutableList()
+                    java.util.Collections.swap(order, index, index + 1)
+                    onChange(value.copy(stageOrder = order))
+                }) { Text("↓") }
+            }
+        }
+        EntryField(
+            stringResource(slop.miho.chumpy.R.string.custom_routing_target_blocked), value.blocked,
+            categorySuggestionsGeo, categorySuggestionsIp,
+            onQueryPrefix = { prefix -> maybeLoadCatalog(prefix, value, geositeCategories, geoipCategories, automaticCatalogRequests, { automaticCatalogRequests = it }, ::loadCategories) },
+            onChange = { onChange(value.copy(blocked = it)) },
+        )
+        EntryField(
+            stringResource(slop.miho.chumpy.R.string.custom_routing_target_direct), value.direct,
+            categorySuggestionsGeo, categorySuggestionsIp,
+            onQueryPrefix = { prefix -> maybeLoadCatalog(prefix, value, geositeCategories, geoipCategories, automaticCatalogRequests, { automaticCatalogRequests = it }, ::loadCategories) },
+            onChange = { onChange(value.copy(direct = it)) },
+        )
+        EntryField(
+            stringResource(slop.miho.chumpy.R.string.custom_routing_target_proxy), value.proxy,
+            categorySuggestionsGeo, categorySuggestionsIp,
+            onQueryPrefix = { prefix -> maybeLoadCatalog(prefix, value, geositeCategories, geoipCategories, automaticCatalogRequests, { automaticCatalogRequests = it }, ::loadCategories) },
+            onChange = { onChange(value.copy(proxy = it)) },
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            geodataPresets.forEach { preset ->
+                FilterChip(
+                    selected = value.geositeUrl == preset.geosite && value.geoipUrl == preset.geoip,
+                    onClick = { onChange(value.copy(geositeUrl = preset.geosite, geoipUrl = preset.geoip, customGeosite = false, customGeoip = false)) },
+                    label = { Text(preset.name) },
+                )
+            }
+        }
+        OutlinedTextField(
+            value = value.geositeUrl,
+            onValueChange = { onChange(value.copy(geositeUrl = it, customGeosite = false)) },
+            label = { Text(stringResource(slop.miho.chumpy.R.string.custom_routing_geosite_url)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = value.geoipUrl,
+            onValueChange = { onChange(value.copy(geoipUrl = it, customGeoip = false)) },
+            label = { Text(stringResource(slop.miho.chumpy.R.string.custom_routing_geoip_url)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geosite), modifier = Modifier.weight(1f))
+            Switch(value.customGeosite, onCheckedChange = { onChange(value.copy(customGeosite = it)) })
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geoip), modifier = Modifier.weight(1f))
+            Switch(value.customGeoip, onCheckedChange = { onChange(value.copy(customGeoip = it)) })
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = !importing, onClick = { importGeoip = false; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
+                Text(stringResource(if (value.customGeosite) slop.miho.chumpy.R.string.custom_routing_replace_geosite else slop.miho.chumpy.R.string.custom_routing_import_geosite))
+            }
+            Button(enabled = !importing, onClick = { importGeoip = true; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
+                Text(stringResource(if (value.customGeoip) slop.miho.chumpy.R.string.custom_routing_replace_geoip else slop.miho.chumpy.R.string.custom_routing_import_geoip))
+            }
+        }
+        notice?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    }
+}
+
+@Composable
+private fun stageLabel(stage: CustomRouteStage): String = stringResource(
+    when (stage) {
+        CustomRouteStage.BLOCKED -> slop.miho.chumpy.R.string.custom_routing_target_blocked
+        CustomRouteStage.DIRECT -> slop.miho.chumpy.R.string.custom_routing_target_direct
+        CustomRouteStage.PROXY -> slop.miho.chumpy.R.string.custom_routing_target_proxy
+    },
+)
+
+private fun maybeLoadCatalog(
+    prefix: String?,
+    settings: CustomRouting,
+    geositeCategories: List<String>,
+    geoipCategories: List<String>,
+    attempted: Set<CategorySource>,
+    updateAttempted: (Set<CategorySource>) -> Unit,
+    load: (CategorySource) -> Unit,
+) {
+    val source = when (prefix) {
+        "geosite:" -> CategorySource.GEOSITE
+        "geoip:" -> CategorySource.GEOIP
+        else -> return
+    }
+    val ready = if (source == CategorySource.GEOSITE) geositeCategories.isNotEmpty() else geoipCategories.isNotEmpty()
+    val imported = if (source == CategorySource.GEOSITE) settings.customGeosite else settings.customGeoip
+    val url = if (source == CategorySource.GEOSITE) settings.geositeUrl else settings.geoipUrl
+    if (!ready && !imported && url.isNotBlank() && source !in attempted) {
+        updateAttempted(attempted + source)
+        load(source)
+    }
+}
+
+@Composable
+private fun EntryField(
+    title: String,
+    entries: List<String>,
+    geositeCategories: List<String>,
+    geoipCategories: List<String>,
+    onQueryPrefix: (String?) -> Unit,
+    onChange: (List<String>) -> Unit,
+) {
+    var text by remember(entries) { mutableStateOf(entries.joinToString("\n")) }
+    val current = text.substringAfterLast('\n')
+    val prefix = when {
+        current.startsWith("geosite:", ignoreCase = true) -> "geosite:"
+        current.startsWith("geoip:", ignoreCase = true) -> "geoip:"
+        else -> null
+    }
+    val categoryQuery = if (prefix == null) "" else current.substring(prefix.length)
+    val candidates = when (prefix) {
+        "geosite:" -> geositeCategories
+        "geoip:" -> geoipCategories
+        else -> emptyList()
+    }
+    val terms = categoryQuery.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter(String::isNotBlank)
+    val suggestions = if (prefix == null) emptyList() else candidates.filter { candidate ->
+        val normalized = candidate.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+        terms.all { term -> normalized.contains(term) }
+    }.take(16)
+    fun update(next: String) {
+        text = next
+        onChange(next.lineSequence().map(String::trim).filter(String::isNotEmpty).distinct().toList())
+    }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { next ->
+            update(next)
+            val lastLine = next.substringAfterLast('\n')
+            onQueryPrefix(when {
+                lastLine.startsWith("geosite:", true) -> "geosite:"
+                lastLine.startsWith("geoip:", true) -> "geoip:"
+                else -> null
+            })
+        },
+        label = { Text(title) },
+        minLines = 3,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (suggestions.isNotEmpty()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            suggestions.forEach { category ->
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        val completed = prefix + category.lowercase()
+                        val next = if ('\n' in text) text.substringBeforeLast('\n') + "\n" + completed else completed
+                        update(next)
+                    },
+                    label = { Text(category) },
+                )
+            }
+        }
+    }
+}

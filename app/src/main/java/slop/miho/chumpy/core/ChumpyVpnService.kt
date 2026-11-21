@@ -23,6 +23,7 @@ import android.util.Log
 import slop.miho.chumpy.MainActivity
 import slop.miho.chumpy.R
 import slop.miho.chumpy.data.ConnectionStore
+import slop.miho.chumpy.data.PerAppMode
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
@@ -492,12 +493,11 @@ class ChumpyVpnService : VpnService() {
                 val config = CoreConfigFile.readConfig(this)
                     ?: throw IllegalStateException(getString(R.string.error_no_config))
                 val connection = ConnectionStore.current(this)
-                val appFilter = Triple(connection.perAppEnabled, connection.bypassedApps, connection.bypassLan)
                 stopTunnelWatch()
                 XrayCore.stopLoop()
                 closeTun()
                 closeKeptTun()
-                val tun = establishTun(appFilter.first to appFilter.second, appFilter.third)
+                val tun = establishTun(connection.perAppMode, connection.bypassedApps, connection.bypassLan)
                     ?: throw IllegalStateException(getString(R.string.error_tun_creation))
                 tunInterface = tun
                 XrayCore.startLoop(config, tun.fd)?.let { throw it }
@@ -689,7 +689,7 @@ class ChumpyVpnService : VpnService() {
         }
     }
 
-    private fun establishTun(appFilter: Pair<Boolean, Set<String>>, bypassLan: Boolean): ParcelFileDescriptor? {
+    private fun establishTun(mode: PerAppMode, packages: Set<String>, bypassLan: Boolean): ParcelFileDescriptor? {
         val builder = Builder()
             .setMtu(TUN_MTU)
             .addAddress(TUN_ADDRESS, TUN_PREFIX)
@@ -712,24 +712,46 @@ class ChumpyVpnService : VpnService() {
         // The core's own sockets must not route back into the tunnel: the app package is
         // excluded from the VPN, and the UI reaches the core's local socks inbound over
         // loopback instead (v2rayNG's arrangement, and every tun-based client's).
+        when (mode) {
+            PerAppMode.OFF -> disallowOwnPackage(builder)
+            PerAppMode.BYPASS -> {
+                disallowOwnPackage(builder)
+                packages.forEach { pkg -> disallow(builder, pkg) }
+            }
+            PerAppMode.ONLY -> {
+                // The inverse list: only the picked apps ride the tunnel. An allowed list
+                // already excludes everything else — our own package included, which is
+                // why the own-package disallow is not added beside it (the platform
+                // refuses both lists at once). With nothing picked there is no tunnel to
+                // shape: fail loudly rather than quietly proxying the whole phone.
+                val picked = packages - packageName
+                if (picked.isEmpty()) throw IllegalStateException(getString(R.string.per_app_only_empty))
+                picked.forEach { pkg ->
+                    try {
+                        builder.addAllowedApplication(pkg)
+                    } catch (e: PackageManager.NameNotFoundException) {
+                        Log.w(TAG, "Proxied app not found: $pkg")
+                    }
+                }
+            }
+        }
+        return builder.establish()
+    }
+
+    private fun disallowOwnPackage(builder: Builder) {
         try {
             builder.addDisallowedApplication(packageName)
         } catch (e: PackageManager.NameNotFoundException) {
             Log.wtf(TAG, "Own package not found", e)
         }
-        // The per-app bypass: packages the user pulled out of the tunnel, the list's own
-        // master switch permitting. Read straight off disk — this process's cached copy
-        // goes stale the moment the UI writes.
-        if (appFilter.first) {
-            appFilter.second.forEach { pkg ->
-                try {
-                    builder.addDisallowedApplication(pkg)
-                } catch (e: PackageManager.NameNotFoundException) {
-                    Log.w(TAG, "Bypassed app not found: $pkg")
-                }
-            }
+    }
+
+    private fun disallow(builder: Builder, pkg: String) {
+        try {
+            builder.addDisallowedApplication(pkg)
+        } catch (e: PackageManager.NameNotFoundException) {
+            Log.w(TAG, "Bypassed app not found: $pkg")
         }
-        return builder.establish()
     }
 
     private fun closeTun() {

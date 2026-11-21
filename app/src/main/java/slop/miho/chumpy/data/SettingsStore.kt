@@ -140,6 +140,8 @@ data class UiSettings(
     val happLocale: String = "",
     val happUserId: String = "",
     val happHwid: String = "",
+    /** Whether global spoof requests include x-hwid / INCY's X-Device-ID. */
+    val happSendHwid: Boolean = true,
     /** The [FontRegistry] id of the app-wide typeface; Inter out of the box. */
     val fontId: String = FontRegistry.INTER_ID,
     /** How the server list draws each exit's country. */
@@ -339,6 +341,7 @@ object SettingsStore {
                 .ifBlank { HappSpoof.randomUserId() },
             happHwid = prefs.getString(KEY_HAPP_HWID, null).orEmpty()
                 .ifBlank { HappSpoof.randomHwid() },
+            happSendHwid = prefs.getBoolean(KEY_HAPP_SEND_HWID, true),
             fontId = prefs.getString(KEY_FONT, null) ?: FontRegistry.INTER_ID,
             flagStyle = enumEntry(prefs.getString(KEY_FLAG_STYLE, null), FlagStyle.TWEMOJI),
             iconVariant = enumEntry(prefs.getString(KEY_ICON_VARIANT, null), IconVariant.CHUMPY),
@@ -394,6 +397,7 @@ object SettingsStore {
             .putString(KEY_HAPP_LOCALE, settings.happLocale)
             .putString(KEY_HAPP_USER_ID, settings.happUserId)
             .putString(KEY_HAPP_HWID, settings.happHwid)
+            .putBoolean(KEY_HAPP_SEND_HWID, settings.happSendHwid)
             .putString(KEY_FONT, settings.fontId)
             .putString(KEY_FLAG_STYLE, settings.flagStyle.name)
             .putString(KEY_ICON_VARIANT, settings.iconVariant.name)
@@ -470,6 +474,7 @@ object SettingsStore {
     private const val KEY_HAPP_LOCALE = "happ_locale"
     private const val KEY_HAPP_USER_ID = "happ_user_id"
     private const val KEY_HAPP_HWID = "happ_hwid"
+    private const val KEY_HAPP_SEND_HWID = "happ_send_hwid"
     private const val KEY_FONT = "font"
     private const val KEY_FLAG_STYLE = "flag_style"
     private const val KEY_ICON_VARIANT = "icon_variant"

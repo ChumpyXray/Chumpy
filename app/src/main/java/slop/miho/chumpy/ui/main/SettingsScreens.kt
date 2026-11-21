@@ -813,6 +813,7 @@ private fun ScreenLinkRow(
     supporting: String,
     icon: Int,
     target: Class<*>,
+    extra: Pair<String, String>? = null,
 ) {
     val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -834,7 +835,9 @@ private fun ScreenLinkRow(
             ) {
                 poke()
                 taps++
-                context.startActivity(Intent(context, target))
+                val intent = Intent(context, target)
+                extra?.let { (key, value) -> intent.putExtra(key, value) }
+                context.startActivity(intent)
             }
             .padding(horizontal = 16.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -1059,12 +1062,29 @@ fun ConnectionScreen(
         // the tunnel at all.
         SettingsGroup(
             {
-                RoutingRow(
-                    selected = connection.routingMode,
-                    flagStyle = flagStyle,
-                    onSelect = { mode ->
-                        onChangeConnection { it.copy(routingMode = mode) }
-                    },
+                if (connection.customRouting.enabled) {
+                    Text(
+                        text = stringResource(R.string.custom_routing_exclusive_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+                    )
+                } else {
+                    RoutingRow(
+                        selected = connection.routingMode,
+                        flagStyle = flagStyle,
+                        onSelect = { mode -> onChangeConnection { it.copy(routingMode = mode) } },
+                    )
+                }
+            },
+            {
+                ScreenLinkRow(
+                    title = stringResource(R.string.custom_routing_title),
+                    supporting = if (connection.customRouting.enabled) {
+                        stringResource(R.string.custom_routing_count, connection.customRouting.entryCount)
+                    } else stringResource(R.string.custom_routing_off),
+                    icon = R.drawable.ic_tune,
+                    target = slop.miho.chumpy.ui.routing.CustomRoutingActivity::class.java,
                 )
             },
             {
@@ -1072,6 +1092,11 @@ fun ConnectionScreen(
                     title = stringResource(R.string.per_app_title),
                     supporting = when {
                         !connection.perAppEnabled -> stringResource(R.string.per_app_disabled)
+                        connection.perAppOnly -> pluralStringResource(
+                            R.plurals.per_app_only_count,
+                            connection.bypassedApps.size,
+                            connection.bypassedApps.size,
+                        )
                         connection.bypassedApps.isEmpty() -> stringResource(R.string.per_app_hint)
                         else -> pluralStringResource(
                             R.plurals.per_app_count,
@@ -1191,6 +1216,17 @@ fun ConnectionScreen(
             ),
             rows = listOf(
                 {
+                    ToggleRow(
+                        title = stringResource(R.string.happ_send_hwid),
+                        supporting = stringResource(
+                            if (settings.happSendHwid) R.string.happ_send_hwid_on else R.string.happ_send_hwid_off,
+                        ),
+                        icon = R.drawable.ic_device,
+                        checked = settings.happSendHwid,
+                        onChange = { enabled -> onChangeSettings { it.copy(happSendHwid = enabled) } },
+                    )
+                },
+                {
                     HappRegenerateRow(
                         onRegenerate = { happRegenPending = true },
                     )
@@ -1301,6 +1337,17 @@ fun ConnectionScreen(
                     }
                 },
             )
+            SettingsGroup(*subscriptions.map { subscription ->
+                @Composable {
+                    ScreenLinkRow(
+                        title = subscription.name.ifBlank { stringResource(R.string.subscription_none) },
+                        supporting = stringResource(R.string.subscription_request_settings),
+                        icon = R.drawable.ic_database,
+                        target = slop.miho.chumpy.ui.request.SubscriptionRequestActivity::class.java,
+                        extra = slop.miho.chumpy.ui.request.SubscriptionRequestActivity.EXTRA_ID to subscription.id,
+                    )
+                }
+            }.toTypedArray())
         }
     }
 }

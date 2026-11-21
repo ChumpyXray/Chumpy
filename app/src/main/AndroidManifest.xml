@@ -152,6 +152,14 @@
             android:name=".ui.perapp.PerAppProxyActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".ui.routing.CustomRoutingActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".ui.request.SubscriptionRequestActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
         <!--
             The QR scanner: a full-screen camera that returns one decoded string. A
             separate activity rather than a navbar destination: it needs the camera

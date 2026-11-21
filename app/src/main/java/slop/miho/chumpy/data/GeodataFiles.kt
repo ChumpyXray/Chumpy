@@ -15,9 +15,24 @@ import java.util.Locale
 
 internal object GeodataFiles {
     const val MAX_BYTES = 64L * 1024 * 1024
+    /** Full catalogs are only cached for category browsing and reduced before core startup. */
+    const val MAX_SOURCE_BYTES = 512L * 1024 * 1024
+    const val CATALOG_GEOSITE_FILE = "catalog-geosite-full.dat"
+    const val CATALOG_GEOIP_FILE = "catalog-geoip-full.dat"
+
+    /** The user's imported databases, in the same assets directory as the bundled ones. */
+    const val USER_GEOSITE_FILE = "user-geosite.dat"
+    const val USER_GEOIP_FILE = "user-geoip.dat"
+
     private val mutex = Mutex()
     private val json = Json { ignoreUnknownKeys = true }
     private data class Reference(val value: String, val file: String, val category: String)
+
+    fun catalogFile(context: Context, url: String): File {
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(url.toByteArray()).joinToString("") { "%02x".format(it) }
+        return File(File(context.filesDir, "xray_assets").apply { mkdirs() }, "catalog-$hash.dat")
+    }
 
     private fun references(config: JsonObject): List<Reference> {
         val rules = ((config["routing"] as? JsonObject)?.get("rules") as? JsonArray).orEmpty()
@@ -42,15 +57,57 @@ internal object GeodataFiles {
         }
     }
 
-    suspend fun prepare(context: Context, config: String, sources: String, allowStandardFallback: Boolean = false, fetch: suspend (String, File) -> Unit): String = mutex.withLock {
+    suspend fun prepare(
+        context: Context,
+        config: String,
+        sources: String,
+        allowStandardFallback: Boolean = false,
+        fetch: suspend (String, File) -> Unit,
+        overrides: Map<String, String> = emptyMap(),
+        sourceOverrides: Map<String, String> = emptyMap(),
+        fetchCatalog: suspend (String, File) -> Unit = fetch,
+    ): String = mutex.withLock {
         val root = json.parseToJsonElement(config) as JsonObject
         val refs = references(root)
-        val urls = GeodataSources.parse(sources).values.associateBy { GeodataSources.filenameFor(it) }
+        val urls = GeodataSources.parse(sources) + sourceOverrides
         val directory = File(context.filesDir, "xray_assets").apply { mkdirs() }
         val replacements = mutableMapOf<String, String>()
         for ((name, requested) in refs.groupBy { it.file }) {
             val categories = requested.map { it.category.removePrefix("!").substringBefore('@').uppercase(Locale.ROOT) }.toSet()
+            // A database the user imported wins over both the bundled one and any
+            // provider URL: the config's references are rewritten onto its own file.
+            val customName = overrides[name]
+            if (customName != null && GeodataSources.validFilename(customName)) {
+                val custom = File(directory, customName)
+                if (!custom.isFile || custom.length() !in 1..MAX_SOURCE_BYTES) throw IOException("Custom geodata file is missing or too large")
+                val identity = "$customName:${custom.length()}:${custom.lastModified()}"
+                replacements[name] = selectedGeodata(custom, identity, categories, directory).name
+                continue
+            }
             var url = urls[name]
+            val customUrl = sourceOverrides[name]
+            if (customUrl != null) {
+                val sourceHash = MessageDigest.getInstance("SHA-256")
+                    .digest(customUrl.toByteArray()).joinToString("") { "%02x".format(it) }
+                val catalog = catalogFile(context, customUrl)
+                val catalogFresh = catalog.isFile && catalog.length() in 1..MAX_SOURCE_BYTES &&
+                    System.currentTimeMillis() - catalog.lastModified() in 0..86_400_000L
+                if (!catalogFresh) {
+                    val temporary = File.createTempFile("catalog-", ".part", directory)
+                    try {
+                        fetchCatalog(customUrl, temporary)
+                        temporary.inputStream().use { GeodataFiles.categories(it, MAX_SOURCE_BYTES) }
+                        if (!temporary.renameTo(catalog)) {
+                            catalog.delete()
+                            if (!temporary.renameTo(catalog)) throw IOException("Could not cache geodata catalog")
+                        }
+                    } finally {
+                        temporary.delete()
+                    }
+                }
+                replacements[name] = selectedGeodata(catalog, sourceHash, categories, directory).name
+                continue
+            }
             if (url == null) {
                 val available = try {
                     if (name == "geosite.dat" || name == "geoip.dat") context.assets.open(name).use(::categories)
@@ -104,6 +161,7 @@ internal object GeodataFiles {
                 when {
                     parts.size == 3 && replacements.containsKey(parts[1]) -> JsonPrimitive("ext:${replacements.getValue(parts[1])}:${parts[2]}")
                     value.isString && text.startsWith("geosite:") && replacements.containsKey("geosite.dat") -> JsonPrimitive("ext:${replacements.getValue("geosite.dat")}:${text.removePrefix("geosite:")}")
+                    value.isString && text.startsWith("geoip:") && replacements.containsKey("geoip.dat") -> JsonPrimitive("ext:${replacements.getValue("geoip.dat")}:${text.removePrefix("geoip:")}")
                     else -> value
                 }
             }
@@ -120,12 +178,13 @@ internal object GeodataFiles {
             runCatching { references(json.parseToJsonElement(slop.miho.chumpy.core.CoreConfigFile.readConfig(context).orEmpty()) as JsonObject).map { it.file } }.getOrDefault(emptyList())
         val cutoff = System.currentTimeMillis() - 7 * 86_400_000L
         directory.listFiles()?.filter { file ->
-            file.name.startsWith("provider-") && file.extension == "dat" && file.name !in protected && file.lastModified() < cutoff
+            (file.name.startsWith("provider-") || file.name.startsWith("selected-")) &&
+                file.extension == "dat" && file.name !in protected && file.lastModified() < cutoff
         }?.forEach { it.delete() }
         prepared
     }
 
-    fun categories(source: InputStream): Set<String> {
+    fun categories(source: InputStream, maxBytes: Long = MAX_BYTES): Set<String> {
         val input = source.buffered()
         val result = mutableSetOf<String>()
         var total = 0L
@@ -135,7 +194,7 @@ internal object GeodataFiles {
             require(++entries <= 100_000) { "Too many geodata categories" }
             require(tag == 10L) { "Invalid geodata container" }
             val length = varint(input)!!
-            require(length in 1..MAX_BYTES && total + length <= MAX_BYTES) { "Geodata size limit" }
+            require(length in 1..maxBytes && total + length <= maxBytes) { "Geodata size limit" }
             total += length
             val entry = LimitedInput(input, length)
             var name: String? = null
@@ -164,6 +223,120 @@ internal object GeodataFiles {
         }
         require(result.isNotEmpty()) { "Empty geodata" }
         return result
+    }
+
+    private fun selectedGeodata(
+        catalog: File,
+        identity: String,
+        requested: Collection<String>,
+        directory: File,
+    ): File {
+        val selectedCategories = requested.map {
+            it.removePrefix("!").substringBefore('@').uppercase(Locale.ROOT)
+        }.toSet()
+        require(selectedCategories.isNotEmpty()) { "No geodata categories selected" }
+        val identityHash = MessageDigest.getInstance("SHA-256")
+            .digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
+        val selectedHash = MessageDigest.getInstance("SHA-256")
+            .digest((identityHash + selectedCategories.sorted().joinToString(",")).toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        val selectedFile = File(directory, "selected-$selectedHash.dat")
+        val cached = selectedFile.isFile && selectedFile.length() in 1..MAX_BYTES &&
+            runCatching { selectedFile.inputStream().use { categories(it).containsAll(selectedCategories) } }.getOrDefault(false)
+        if (cached) return selectedFile
+
+        val temporary = File.createTempFile("selected-", ".part", directory)
+        try {
+            val present = catalog.inputStream().use { input ->
+                temporary.outputStream().use { output -> filterCategories(input, output, selectedCategories) }
+            }
+            val missing = selectedCategories - present
+            if (missing.isNotEmpty()) throw IOException("Geodata categories missing: ${missing.sorted().joinToString(", ")}")
+            if (temporary.length() > MAX_BYTES) throw IOException("Selected geodata exceeds 64 MiB")
+            selectedFile.delete()
+            if (!temporary.renameTo(selectedFile)) throw IOException("Could not store selected geodata")
+        } finally {
+            temporary.delete()
+        }
+        return selectedFile
+    }
+
+    /** Copies only selected GeoSite/GeoIP records, retaining the Xray protobuf envelope. */
+    fun filterCategories(source: InputStream, target: java.io.OutputStream, selected: Set<String>): Set<String> {
+        val input = source.buffered()
+        val present = mutableSetOf<String>()
+        var total = 0L
+        var entries = 0
+        var outputBytes = 0L
+        while (true) {
+            val tag = varint(input, eof = true) ?: break
+            require(tag == 10L) { "Invalid geodata container" }
+            val length = varint(input) ?: throw IOException("Truncated geodata")
+            require(length in 1..MAX_BYTES && total + length <= MAX_SOURCE_BYTES) { "Geodata record or database size limit" }
+            total += length
+            require(++entries <= 1_000_000) { "Too many geodata categories" }
+            val payload = ByteArray(length.toInt())
+            var offset = 0
+            while (offset < payload.size) {
+                val count = input.read(payload, offset, payload.size - offset)
+                if (count < 0) throw IOException("Truncated geodata")
+                offset += count
+            }
+            val name = categoryName(payload)
+            if (name in selected) {
+                outputBytes += 1L + varintSize(length).toLong() + length
+                require(outputBytes <= MAX_BYTES) { "Selected geodata exceeds 64 MiB" }
+                writeVarint(target, 10L)
+                writeVarint(target, length)
+                target.write(payload)
+                present += name
+            }
+        }
+        target.flush()
+        return present
+    }
+
+    private fun categoryName(payload: ByteArray): String {
+        val entry = java.io.ByteArrayInputStream(payload)
+        var name: String? = null
+        while (entry.available() > 0) {
+            val field = varint(entry) ?: throw IOException("Truncated geodata category")
+            require(field shr 3 > 0) { "Invalid geodata field" }
+            when ((field and 7).toInt()) {
+                0 -> varint(entry)
+                1 -> skip(entry, 8)
+                2 -> {
+                    val size = varint(entry) ?: throw IOException("Truncated geodata category")
+                    require(size <= entry.available().toLong()) { "Truncated geodata category" }
+                    if (field shr 3 == 1L) {
+                        require(size in 1..256) { "Invalid category" }
+                        val bytes = ByteArray(size.toInt())
+                        require(entry.read(bytes) == bytes.size) { "Truncated geodata category" }
+                        name = bytes.toString(Charsets.UTF_8).uppercase(Locale.ROOT)
+                    } else skip(entry, size)
+                }
+                5 -> skip(entry, 4)
+                else -> throw IOException("Invalid geodata wire type")
+            }
+        }
+        return name?.takeIf(String::isNotBlank) ?: throw IOException("Missing geodata category")
+    }
+
+    private fun writeVarint(output: java.io.OutputStream, input: Long) {
+        require(input >= 0)
+        var value = input
+        while (value >= 0x80) {
+            output.write(((value and 0x7f) or 0x80).toInt())
+            value = value shr 7
+        }
+        output.write(value.toInt())
+    }
+
+    private fun varintSize(input: Long): Int {
+        var value = input
+        var size = 1
+        while (value >= 0x80) { value = value shr 7; size++ }
+        return size
     }
 
     private fun varint(input: InputStream, eof: Boolean = false): Long? {
