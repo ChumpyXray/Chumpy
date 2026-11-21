@@ -381,8 +381,11 @@ class OrbWidget : AppWidgetProvider() {
                 connection.routingMode,
                 members,
                 connection.delayTestUrl,
+                connection.customRouting,
             ),
             connection.routingMode == RoutingMode.GLOBAL && profile.routingRules.isNotBlank(),
+            connection.customRouting.geodataOverrides,
+            connection.customRouting.geodataSources,
         )
         val subscriptionName = profile.subscriptionId?.let { repository.subscriptionById(it)?.name }
         synchronized(CoreConfigFile) {

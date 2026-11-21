@@ -1,4 +1,29 @@
 <resources>
+    <string name="custom_routing_title">Своя маршрутизация</string>
+    <string name="custom_routing_off">Правила блокировки, обхода и прокси</string>
+    <string name="custom_routing_count">Свои правила: %1$d</string>
+    <string name="custom_routing_exclusive_hint">Своя маршрутизация включена; региональные пресеты отключены.</string>
+    <string name="custom_routing_chain_hint">При включении эта цепочка заменяет региональные пресеты и правила подписки.</string>
+    <string name="custom_routing_enabled">Включить свои правила</string>
+    <string name="custom_routing_only_chain">Используется только эта цепочка</string>
+    <string name="custom_routing_order">Порядок правил (сверху — приоритетнее)</string>
+    <string name="custom_routing_last_stage_fallback">Если совпадений нет, используется последняя стадия.</string>
+    <string name="custom_routing_sources_hint">Выберите готовый источник или укажите HTTPS-ссылку. Источники используются для правил geosite: и geoip:.</string>
+    <string name="custom_routing_trim_hint">Полные файлы хранятся для подсказок категорий; перед запуском остаются только выбранные категории.</string>
+    <string name="custom_routing_geosite_url">Ссылка на geosite.dat</string>
+    <string name="custom_routing_geoip_url">Ссылка на geoip.dat</string>
+    <string name="custom_routing_use_imported_geosite">Использовать импортированный geosite.dat</string>
+    <string name="custom_routing_use_imported_geoip">Использовать импортированный geoip.dat</string>
+    <string name="custom_routing_import_geosite">Импортировать geosite.dat</string>
+    <string name="custom_routing_replace_geosite">Заменить geosite.dat</string>
+    <string name="custom_routing_import_geoip">Импортировать geoip.dat</string>
+    <string name="custom_routing_replace_geoip">Заменить geoip.dat</string>
+    <string name="custom_routing_file_hint">Нужны бинарные protobuf-файлы Xray geosite.dat / geoip.dat.</string>
+    <string name="custom_routing_loaded_count">Загружено категорий: %1$d</string>
+    <string name="custom_routing_imported_count">Импортировано категорий: %1$d</string>
+    <string name="custom_routing_target_blocked">Блокировать</string>
+    <string name="custom_routing_target_direct">Напрямую</string>
+    <string name="custom_routing_target_proxy">Через прокси</string>
     <!-- Стадия сборки — тихая плашка рядом с именем. -->
     <string name="badge_alpha">Альфа</string>
 

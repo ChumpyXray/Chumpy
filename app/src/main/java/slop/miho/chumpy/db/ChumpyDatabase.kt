@@ -33,6 +33,37 @@ interface SubscriptionDao {
     @Query("UPDATE subscriptions SET pinned = :pinned WHERE id = :id")
     suspend fun setPinned(id: String, pinned: Boolean)
 
+    /** The per-subscription request overrides — a targeted update, the row's metadata untouched. */
+    @Query(
+        """
+        UPDATE subscriptions SET
+            requestSpoofMode = :spoofMode,
+            requestSendHwid = :sendHwid,
+            requestAppVersion = :appVersion,
+            requestUserAgent = :userAgent,
+            requestUserId = :userId,
+            requestHwid = :hwid,
+            requestOs = :os,
+            requestOsVersion = :osVersion,
+            requestDeviceModel = :deviceModel,
+            requestLocale = :locale
+        WHERE id = :id
+        """,
+    )
+    suspend fun setRequestSettings(
+        id: String,
+        spoofMode: String?,
+        sendHwid: Boolean?,
+        appVersion: String?,
+        userAgent: String?,
+        userId: String?,
+        hwid: String?,
+        os: String?,
+        osVersion: String?,
+        deviceModel: String?,
+        locale: String?,
+    )
+
     @Query("UPDATE subscriptions SET lastUpdateAttempt = :at, lastError = :error WHERE id = :id")
     suspend fun setUpdateError(id: String, at: Long, error: String)
 
@@ -100,7 +131,7 @@ abstract class ProfileDao {
  */
 @Database(
     entities = [SubscriptionEntity::class, ProfileEntity::class],
-    version = 13,
+    version = 14,
     exportSchema = false,
 )
 abstract class ChumpyDatabase : RoomDatabase() {
@@ -242,6 +273,22 @@ abstract class ChumpyDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE subscriptions ADD COLUMN supportUrl TEXT")
                 db.execSQL("ALTER TABLE subscriptions ADD COLUMN webPageUrl TEXT")
                 db.execSQL("ALTER TABLE subscriptions ADD COLUMN announcement TEXT")
+            }
+        }
+
+        /** v14: per-subscription request identity and header overrides. */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestSpoofMode TEXT")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestSendHwid INTEGER")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestAppVersion TEXT")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestUserAgent TEXT")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestUserId TEXT")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestHwid TEXT")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestOs TEXT")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestOsVersion TEXT")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestDeviceModel TEXT")
+                db.execSQL("ALTER TABLE subscriptions ADD COLUMN requestLocale TEXT")
             }
         }
 

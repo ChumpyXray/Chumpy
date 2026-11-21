@@ -98,6 +98,10 @@
     <string name="happ_locale">Language</string>
     <string name="happ_user_id">User ID</string>
     <string name="happ_hwid">HWID</string>
+    <string name="happ_send_hwid">Send HWID</string>
+    <string name="happ_send_hwid_on">Include the hardware ID in spoofed requests</string>
+    <string name="happ_send_hwid_off">Do not send an HWID header</string>
+    <string name="subscription_request_title">Subscription request</string>
     <string name="happ_regenerate">Regenerate identity</string>
     <string name="happ_regenerate_title">Regenerate the identity?</string>
     <string name="happ_regenerate_text">A new user ID and hardware ID take the old one\'s place — the panels will see a fresh device they have never met, and the current identity is gone for good.</string>
@@ -165,6 +169,33 @@
     <string name="settings_routing_global">Global</string>
     <string name="settings_routing_global_hint">Route everything</string>
     <string name="settings_routing_dont_route">Don\'t route %s</string>
+    <string name="custom_routing_title">Custom routing</string>
+    <string name="custom_routing_off">Blocked, direct and proxy rules</string>
+    <string name="custom_routing_exclusive_hint">Custom routing is active; regional presets are disabled.</string>
+    <string name="custom_routing_chain_hint">When enabled, this chain replaces regional presets and panel routing.</string>
+    <string name="custom_routing_enabled">Enable custom rules</string>
+    <string name="custom_routing_only_chain">Only this rule chain is used</string>
+    <string name="custom_routing_order">Rule order (first match wins)</string>
+    <string name="custom_routing_last_stage_fallback">Unmatched traffic uses the last stage as its fallback.</string>
+    <string name="custom_routing_sources_hint">Choose a ready-made source or enter your own HTTPS URL. Sources are used for geosite: and geoip: rules.</string>
+    <string name="custom_routing_trim_hint">Full files are cached for category suggestions; only selected categories are prepared for the running tunnel.</string>
+    <string name="custom_routing_geosite_url">geosite.dat URL</string>
+    <string name="custom_routing_geoip_url">geoip.dat URL</string>
+    <string name="custom_routing_use_imported_geosite">Use imported geosite.dat</string>
+    <string name="custom_routing_use_imported_geoip">Use imported geoip.dat</string>
+    <string name="custom_routing_import_geosite">Import geosite.dat</string>
+    <string name="custom_routing_replace_geosite">Replace geosite.dat</string>
+    <string name="custom_routing_import_geoip">Import geoip.dat</string>
+    <string name="custom_routing_replace_geoip">Replace geoip.dat</string>
+    <string name="custom_routing_file_hint">Files must be Xray geosite.dat / geoip.dat protobuf databases.</string>
+    <string name="custom_routing_loaded_count">Loaded %1$d categories</string>
+    <string name="custom_routing_imported_count">Imported %1$d categories</string>
+    <string name="custom_routing_target_blocked">Blocked</string>
+    <string name="custom_routing_target_direct">Direct</string>
+    <string name="custom_routing_target_proxy">Proxy</string>
+    <string name="custom_routing_count">%1$d custom entries</string>
+    <string name="per_app_only_empty">Pick at least one app to proxy</string>
+    <string name="subscription_request_settings">Request and HWID settings</string>
     <string name="region_ru">Russia</string>
     <string name="region_cn">China</string>
     <string name="region_ir">Iran</string>
@@ -181,6 +212,12 @@
         <item quantity="other">Don\'t route %1$d apps</item>
     </plurals>
     <string name="per_app_disabled">Disabled</string>
+    <string name="per_app_bypass_mode">Bypass selected</string>
+    <string name="per_app_only_mode">Proxy selected only</string>
+    <plurals name="per_app_only_count">
+        <item quantity="one">Proxy only %1$d app</item>
+        <item quantity="other">Proxy only %1$d apps</item>
+    </plurals>
 
     <string name="connection_auto_reconnect">Auto-reconnect</string>
     <string name="connection_auto_reconnect_on">The tunnel comes back on its own wherever it fell</string>

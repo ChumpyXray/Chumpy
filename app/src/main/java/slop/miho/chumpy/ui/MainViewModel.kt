@@ -474,8 +474,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             connection.drop(1).collect { current ->
                 val bypassChanged = previous.bypassedApps != current.bypassedApps ||
-                    previous.perAppEnabled != current.perAppEnabled || previous.bypassLan != current.bypassLan
-                if (bypassChanged && tunnelStatus.value.state in setOf(TunnelState.UP, TunnelState.CONNECTING)) {
+                    previous.perAppEnabled != current.perAppEnabled ||
+                    previous.perAppOnly != current.perAppOnly ||
+                    previous.bypassLan != current.bypassLan
+                // The custom lists are part of the config itself — a write from their own
+                // screen reloads the running tunnel in place, like the mode's tile does.
+                val customChanged = previous.customRouting != current.customRouting
+                if ((bypassChanged || customChanged) &&
+                    tunnelStatus.value.state in setOf(TunnelState.UP, TunnelState.CONNECTING)) {
                     applyConfigAndConnect()
                 }
                 previous = current
@@ -807,12 +813,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         emptyList()
                     }
-                    val config = repository.prepareGeodata(resolvedProfile, XrayConfigBuilder.buildFull(
+                    val config = repository.prepareGeodata(
                         resolvedProfile,
-                        requestedConnection.routingMode,
-                        members,
-                        requestedConnection.delayTestUrl,
-                    ), requestedConnection.routingMode == RoutingMode.GLOBAL && resolvedProfile.routingRules.isNotBlank())
+                        XrayConfigBuilder.buildFull(
+                            resolvedProfile,
+                            requestedConnection.routingMode,
+                            members,
+                            requestedConnection.delayTestUrl,
+                            requestedConnection.customRouting,
+                        ),
+                        requestedConnection.routingMode == RoutingMode.GLOBAL && resolvedProfile.routingRules.isNotBlank(),
+                        requestedConnection.customRouting.geodataOverrides,
+                        requestedConnection.customRouting.geodataSources,
+                    )
                     val subscriptionName = resolvedProfile.subscriptionId?.let { repository.subscriptionById(it)?.name }
                     currentCoroutineContext().ensureActive()
                     val requestContext = currentCoroutineContext()
