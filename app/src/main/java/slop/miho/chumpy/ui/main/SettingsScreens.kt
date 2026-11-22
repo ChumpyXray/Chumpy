@@ -59,6 +59,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -122,6 +123,7 @@ import slop.miho.chumpy.R
 import slop.miho.chumpy.data.Accent
 import slop.miho.chumpy.data.FlagStyle
 import slop.miho.chumpy.data.IconVariant
+import slop.miho.chumpy.data.SpoofMode
 import slop.miho.chumpy.data.ThemeMode
 import slop.miho.chumpy.data.UiSettings
 import slop.miho.chumpy.ui.components.FlipTriangleTile
@@ -645,7 +647,6 @@ private fun ToggleRow(
     checked: Boolean,
     onChange: (Boolean) -> Unit,
     onLongClick: (() -> Unit)? = null,
-    rotateIconOnClick: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -699,7 +700,6 @@ private fun ToggleRow(
             pressed = pressed,
             taps = taps,
             focused = { rowFocused },
-            rotateOnClick = rotateIconOnClick,
         )
     }
 }
@@ -716,7 +716,6 @@ private fun ToggleIconTile(
     pressed: Boolean,
     taps: Int,
     focused: (() -> Boolean)? = null,
-    rotateOnClick: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
@@ -730,11 +729,6 @@ private fun ToggleIconTile(
         targetValue = if (checked) colors.onPrimary else colors.onSecondaryContainer,
         animationSpec = motion.defaultEffectsSpec(),
         label = "toggle tile content",
-    )
-    val rotation = animateFloatAsState(
-        targetValue = if (rotateOnClick) taps * 360f else 0f,
-        animationSpec = motion.defaultSpatialSpec(),
-        label = "toggle icon rotation",
     )
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -754,9 +748,7 @@ private fun ToggleIconTile(
                 Icon(
                     painter = painterResource(res),
                     contentDescription = null,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .graphicsLayer { rotationZ = rotation.value },
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -1156,15 +1148,16 @@ fun ConnectionScreen(
                 )
             },
         )
-        // The Happ spoof's own block, between the carrying and the measuring. The header
+        // The spoof's own block, between the carrying and the measuring. The header
         // carries two rows of its own, separated by the fold rows' own 2dp seam: the
-        // toggle ("Spoof as Happ", Enabled/Disabled) and the strings' doorway beneath
-        // it — "Edit spoof strings" with the background refresh's own triangle — so a
-        // working spoof sits compact, two rows tall, and the fingerprint's seven fields
-        // ride folded behind the doorway, one row each, editable whatever the toggle
-        // says. Enabling the spoof closes the fold: the identity is set, the block goes
-        // quiet. The regenerator leads the fold's list: the tap asks first, the
-        // dialog's confirm rewires the identity over the strings it rewrites.
+        // picker ("Spoofer", with the picked client named beneath it — Happ's big
+        // italic H, INCY's own lowercase word, the crossed-out circle for going out
+        // bare) and the strings' doorway beneath it — "Edit spoof strings" with the
+        // background refresh's own triangle — so a working spoof sits compact, two
+        // rows tall, and the fingerprint's seven fields ride folded behind the
+        // doorway, one row each, editable whatever the picker says. The regenerator
+        // leads the fold's list: the tap asks first, the dialog's confirm rewires the
+        // identity over the strings it rewrites.
         var happOpen by rememberSaveable { mutableStateOf(false) }
         // A fresh identity is one tap away on a whole-row button — too easy to trip.
         // The tap asks first; the dialog's confirm is the deliberate tap the fold's
@@ -1188,13 +1181,29 @@ fun ConnectionScreen(
             expanded = happOpen,
             headerRows = listOf(
                 {
-                    HappToggleRow(
-                        checked = settings.happSpoof,
-                        incy = settings.incySpoof,
-                        onToggle = { enabled ->
-                            onChangeSettings { it.copy(happSpoof = enabled) }
-                            if (enabled) happOpen = false
-                        },
+                    IconChoiceRow(
+                        title = stringResource(R.string.spoof_title),
+                        showSelectedLabel = true,
+                        options = listOf(
+                            IconChoice(R.string.spoof_as_happ, SpoofMode.HAPP) {
+                                // The Happ app's own mark: the bold upright H — the layout
+                                // box centers it on its own, whatever the typeface.
+                                Text(
+                                    text = "H",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            },
+                            IconChoice(R.string.spoof_as_incy, SpoofMode.INCY) {
+                                Text(
+                                    text = "INCY",
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                            },
+                            IconChoice(R.drawable.ic_block, R.string.per_app_disabled, SpoofMode.OFF),
+                        ),
+                        selected = settings.spoofMode,
+                        onSelect = { mode -> onChangeSettings { it.copy(spoofMode = mode) } },
                     )
                 },
                 {
@@ -1206,16 +1215,6 @@ fun ConnectionScreen(
             ),
             rows = listOf(
                 {
-                    ToggleRow(
-                        title = stringResource(R.string.incy_spoof),
-                        supporting = null,
-                        icon = R.drawable.ic_settings,
-                        rotateIconOnClick = true,
-                        checked = settings.incySpoof,
-                        onChange = { enabled -> onChangeSettings { it.copy(incySpoof = enabled) } },
-                    )
-                },
-                {
                     HappRegenerateRow(
                         onRegenerate = { happRegenPending = true },
                     )
@@ -1223,10 +1222,10 @@ fun ConnectionScreen(
                 {
                     HappFieldRow(
                         label = stringResource(R.string.happ_app_version),
-                        value = if (settings.incySpoof) settings.incyAppVersion else settings.happAppVersion,
+                        value = if (settings.spoofMode == SpoofMode.INCY) settings.incyAppVersion else settings.happAppVersion,
                         onChange = { value ->
                             onChangeSettings {
-                                if (it.incySpoof) it.copy(incyAppVersion = value) else it.copy(happAppVersion = value)
+                                if (it.spoofMode == SpoofMode.INCY) it.copy(incyAppVersion = value) else it.copy(happAppVersion = value)
                             }
                         },
                     )
@@ -1559,75 +1558,6 @@ private fun TestUrlRow(
             style = MaterialTheme.typography.bodyMedium,
             color = colors.onSurfaceVariant,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-        )
-    }
-}
-
-/**
- * The block's header row, plain: the title over the status word, the toggle tile at
- * the end. The tap anywhere toggles the spoof — the strings live under their own fold
- * below, behind the edit row, so the toggle and the editing never get in each other's
- * way.
- */
-@Composable
-private fun HappToggleRow(
-    checked: Boolean,
-    incy: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    val colors = MaterialTheme.colorScheme
-    val motion = MaterialTheme.motionScheme
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val poke = rememberHapticPoke()
-    // Bumped in the click handler: the pop keys off it, so it fires on every click.
-    var taps by remember { mutableIntStateOf(0) }
-    // The controller's eye on the row: the whole row carries the focus, and its tile —
-    // the toggle's own stand-in — wears the ring for it.
-    var rowFocused by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .onFocusChanged { rowFocused = it.isFocused }
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current,
-            ) {
-                poke()
-                taps++
-                onToggle(!checked)
-            }
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = stringResource(if (incy) R.string.incy_spoof else R.string.happ_title),
-                style = MaterialTheme.typography.bodyLarge,
-                color = colors.onSurface,
-            )
-            // The word the row answers with: what the fetches go out as right now.
-            Crossfade(
-                targetState = checked,
-                animationSpec = motion.defaultEffectsSpec(),
-                label = "happ status",
-            ) { active ->
-                Text(
-                    text = stringResource(
-                        if (active) R.string.happ_active else R.string.per_app_disabled,
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.onSurfaceVariant,
-                )
-            }
-        }
-        ToggleIconTile(
-            icon = R.drawable.ic_device,
-            checked = checked,
-            pressed = pressed,
-            taps = taps,
-            focused = { rowFocused },
         )
     }
 }

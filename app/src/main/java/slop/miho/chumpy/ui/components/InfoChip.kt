@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import slop.miho.chumpy.ui.wallpapers.withSurfaceOpacity
 
@@ -37,6 +39,9 @@ fun InfoChip(
     leading: (@Composable () -> Unit)? = null,
     container: Color = MaterialTheme.colorScheme.surfaceContainerLow.withSurfaceOpacity(),
     content: Color = MaterialTheme.colorScheme.onSurface,
+    // What the icon-only chip says to the ones who cannot see it; a chip with a
+    // value says it through the value itself and leaves this null.
+    description: String? = null,
     // Animate the value swapping (e.g. shrug → real IP), not the chip appearing.
     animateValue: Boolean = false,
     // Set for the few chips that answer a tap (the exit IP hides itself); null keeps it inert.
@@ -48,12 +53,21 @@ fun InfoChip(
     // a badge that rides a value line (the version row's stage chip) without outgrowing it.
     compact: Boolean = false,
 ) {
+    // An icon without a value is a pill of its own: no half-empty tail of padding.
+    val hasValue = value.isNotEmpty()
     val chipContent: @Composable () -> Unit = {
         Row(
             modifier = if (compact) {
-                Modifier.padding(start = 6.dp, end = 8.dp, top = 2.dp, bottom = 2.dp)
+                Modifier.padding(
+                    start = 6.dp, end = if (hasValue) 8.dp else 6.dp, top = 2.dp, bottom = 2.dp,
+                )
             } else {
-                Modifier.padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+                // An icon-only chip stands as tall as its texted neighbors: the label's
+                // line is 20dp against the icon's 16, so the bare pill pads up the difference.
+                Modifier.padding(
+                    start = 10.dp, end = if (hasValue) 12.dp else 10.dp,
+                    top = if (hasValue) 6.dp else 8.dp, bottom = if (hasValue) 6.dp else 8.dp,
+                )
             },
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -64,21 +78,33 @@ fun InfoChip(
                     modifier = Modifier.size(16.dp),
                     tint = content,
                 )
-                Spacer(Modifier.size(4.dp))
+                if (hasValue) Spacer(Modifier.size(4.dp))
             }
             leading?.invoke()
-            if (leading != null) Spacer(Modifier.size(5.dp))
-            if (animateValue) {
-                val motion = MaterialTheme.motionScheme
-                AnimatedContent(
-                    targetState = value,
-                    transitionSpec = {
-                        fadeIn(motion.defaultEffectsSpec()) togetherWith fadeOut(motion.defaultEffectsSpec())
-                    },
-                    label = "chip value",
-                ) { v ->
+            if (leading != null && hasValue) Spacer(Modifier.size(5.dp))
+            if (hasValue) {
+                if (animateValue) {
+                    val motion = MaterialTheme.motionScheme
+                    AnimatedContent(
+                        targetState = value,
+                        transitionSpec = {
+                            fadeIn(motion.defaultEffectsSpec()) togetherWith fadeOut(motion.defaultEffectsSpec())
+                        },
+                        label = "chip value",
+                    ) { v ->
+                        Text(
+                            text = v,
+                            style = if (compact) {
+                                MaterialTheme.typography.labelMedium
+                            } else {
+                                MaterialTheme.typography.labelLarge
+                            },
+                            color = content,
+                        )
+                    }
+                } else {
                     Text(
-                        text = v,
+                        text = value,
                         style = if (compact) {
                             MaterialTheme.typography.labelMedium
                         } else {
@@ -87,16 +113,6 @@ fun InfoChip(
                         color = content,
                     )
                 }
-            } else {
-                Text(
-                    text = value,
-                    style = if (compact) {
-                        MaterialTheme.typography.labelMedium
-                    } else {
-                        MaterialTheme.typography.labelLarge
-                    },
-                    color = content,
-                )
             }
         }
     }
@@ -106,7 +122,11 @@ fun InfoChip(
     Surface(
         shape = shape,
         color = container,
-        modifier = if (onClick != null) {
+        modifier = (if (description != null) {
+            Modifier.semantics { contentDescription = description }
+        } else {
+            Modifier
+        }).then(if (onClick != null) {
             // The ring rides before the clip — outside it, as every ring sits outside
             // what it marks — and only the chips that answer ever wear one.
             val clickable = if (onLongClick != null) {
@@ -121,7 +141,7 @@ fun InfoChip(
                 .then(clickable)
         } else {
             Modifier
-        },
+        }),
         content = chipContent,
     )
 }

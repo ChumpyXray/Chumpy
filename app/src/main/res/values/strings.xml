@@ -76,6 +76,7 @@
     <string name="config_delete_title">Delete this config?</string>
     <string name="subscription_delete_title">Delete this subscription?</string>
     <string name="card_menu_pin">Pin</string>
+    <string name="card_menu_ping">Ping</string>
     <string name="card_menu_unpin">Unpin</string>
     <string name="card_menu_pinned">Pinned</string>
     <string name="card_menu_hide">Hide</string>
@@ -86,8 +87,9 @@
     <string name="card_menu_yes">Yes</string>
     <string name="card_menu_no">No</string>
 
-    <string name="happ_title">Spoof as Happ</string>
-    <string name="happ_active">Enabled</string>
+    <string name="spoof_title">Spoofer</string>
+    <string name="spoof_as_happ">Spoof as Happ</string>
+    <string name="spoof_as_incy">Spoof as INCY</string>
     <string name="happ_edit">Edit spoof strings</string>
     <string name="happ_app_version">App version</string>
     <string name="happ_os">OS</string>
@@ -179,6 +181,7 @@
         <item quantity="other">Don\'t route %1$d apps</item>
     </plurals>
     <string name="per_app_disabled">Disabled</string>
+
     <string name="connection_auto_reconnect">Auto-reconnect</string>
     <string name="connection_auto_reconnect_on">The tunnel comes back on its own wherever it fell</string>
     <string name="connection_auto_reconnect_off">A fall waits for the alert\'s Reconnect</string>
@@ -325,12 +328,21 @@
     <string name="error_geodata_source_missing">Database %1$s lacks categories %2$s and the subscription provides no download URL. Refresh the subscription or ask the provider for its database.</string>
     <string name="error_geodata_categories">The provider database lacks required categories: %1$s.</string>
     <string name="error_geodata_download">Could not prepare the subscription routing database: %1$s</string>
+
+    <!-- The launcher widget (the orb) -->
+    <string name="widget_name">Chumpy</string>
+    <string name="widget_description">The connection orb: connect, switch the pinned servers, watch the state.</string>
+    <string name="widget_connect">Connect</string>
+    <string name="widget_disconnect">Disconnect</string>
+    <string name="widget_setup">Set up Chumpy</string>
+    <string name="widget_empty">No server yet</string>
     <string name="per_app_search">Search apps</string>
     <string name="per_app_search_empty">No matching apps</string>
     <string name="subscription_link_title">Add subscription?</string>
     <string name="local_network_permission_required">Allow access to nearby devices to receive files from your phone.</string>
     <string name="subscription_support">Support</string>
     <string name="subscription_website">Subscription website</string>
+    <string name="subscription_announcement">Subscription announcement</string>
     <string name="server_ping_action">Check server latency</string>
     <string name="tunnel_error_port_busy">A local port is busy. Close any other VPN or proxy app and try again.</string>
     <string name="tunnel_error_geodata">Couldn\'t load the routing databases. Refresh the subscription and try again.</string>

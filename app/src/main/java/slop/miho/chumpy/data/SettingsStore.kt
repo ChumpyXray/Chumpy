@@ -23,6 +23,12 @@ enum class ThemeMode {
 }
 
 /**
+ * What a subscription fetch dresses up as: the Happ client, the INCY one, or nothing —
+ * the app's own User-Agent and no x- headers.
+ */
+enum class SpoofMode { HAPP, INCY, OFF }
+
+/**
  * How the server list draws an exit's country: Twemoji flags from the bundled font, the
  * system's own emoji flags, or the plain globe icon the list used before flags existed.
  */
@@ -122,12 +128,11 @@ data class UiSettings(
      */
     val notificationsPermissionAsked: Boolean = false,
 
-    // The Happ panel's client fingerprint every subscription fetch goes out with (see
+    // The panel client every subscription fetch dresses up as (see
     // slop.miho.chumpy.sub.HappSpoof): on out of the box, the fields starting whole —
     // the device's honest defaults and a generated identity the panel keeps seeing.
-    val happSpoof: Boolean = true,
+    val spoofMode: SpoofMode = SpoofMode.HAPP,
     val happAppVersion: String = "",
-    val incySpoof: Boolean = false,
     val incyAppVersion: String = HappSpoof.DEFAULT_INCY_APP_VERSION,
     val happOs: String = "",
     val happOsVersion: String = "",
@@ -231,6 +236,9 @@ object SettingsStore {
         val updated = transform(old)
         write(context, updated)
         settingsState.value = updated
+        // The launcher orb paints with the settings' own scheme and flag style; a
+        // write here is its repaint telling.
+        slop.miho.chumpy.widget.OrbWidget.tell(context)
         if (old.iconVariant != updated.iconVariant || old.accent != updated.accent ||
             old.themeMode != updated.themeMode || old.customAccent != updated.customAccent ||
             old.maskAddresses != updated.maskAddresses) {
@@ -306,8 +314,16 @@ object SettingsStore {
             hideIp = prefs.getBoolean(KEY_HIDE_IP, false),
             maskAddresses = prefs.getBoolean(KEY_MASK_ADDRESSES, false),
             notificationsPermissionAsked = prefs.getBoolean(KEY_NOTIFICATIONS_ASKED, false),
-            happSpoof = prefs.getBoolean(KEY_HAPP_SPOOF, true),
-            incySpoof = prefs.getBoolean("incy_spoof", false),
+            // The mode began as two toggles — the master Happ switch and the INCY one
+            // beneath it. Their old keys answer for the mode until it is first saved
+            // in its own right.
+            spoofMode = prefs.getString(KEY_SPOOF_MODE, null)
+                ?.let { stored -> runCatching { SpoofMode.valueOf(stored) }.getOrNull() }
+                ?: when {
+                    prefs.getBoolean("incy_spoof", false) -> SpoofMode.INCY
+                    prefs.getBoolean(KEY_HAPP_SPOOF, true) -> SpoofMode.HAPP
+                    else -> SpoofMode.OFF
+                },
             incyAppVersion = prefs.getString("incy_app_version", null).orEmpty()
                 .let { if (it.isBlank() || it == "1.0") HappSpoof.DEFAULT_INCY_APP_VERSION else it },
             happAppVersion = prefs.getString(KEY_HAPP_APP_VERSION, null).orEmpty()
@@ -369,8 +385,7 @@ object SettingsStore {
             .putBoolean(KEY_HIDE_IP, settings.hideIp)
             .putBoolean(KEY_MASK_ADDRESSES, settings.maskAddresses)
             .putBoolean(KEY_NOTIFICATIONS_ASKED, settings.notificationsPermissionAsked)
-            .putBoolean(KEY_HAPP_SPOOF, settings.happSpoof)
-            .putBoolean("incy_spoof", settings.incySpoof)
+            .putString(KEY_SPOOF_MODE, settings.spoofMode.name)
             .putString("incy_app_version", settings.incyAppVersion)
             .putString(KEY_HAPP_APP_VERSION, settings.happAppVersion)
             .putString(KEY_HAPP_OS, settings.happOs)
@@ -443,7 +458,10 @@ object SettingsStore {
     private const val KEY_MASK_ADDRESSES = "mask_addresses"
     private const val KEY_NOTIFICATIONS_ASKED = "notifications_permission_asked"
 
-    // The Happ fingerprint keys, all one global block.
+    // The Happ fingerprint keys, all one global block. KEY_HAPP_SPOOF and the INCY
+    // key below it are read-only now: the two toggles they kept migrated into
+    // KEY_SPOOF_MODE, and the old keys answer only until the mode is first saved.
+    private const val KEY_SPOOF_MODE = "spoof_mode"
     private const val KEY_HAPP_SPOOF = "happ_spoof"
     private const val KEY_HAPP_APP_VERSION = "happ_app_version"
     private const val KEY_HAPP_OS = "happ_os"

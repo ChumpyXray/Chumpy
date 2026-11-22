@@ -135,6 +135,19 @@ data class ServersUiState(
     val totalServers: Int = 0,
     /** Whether a real-ping sweep over the list is running (the pull-to-refresh action). */
     val isPinging: Boolean = false,
+    /**
+     * When the running sweep started — the stamp that tells the fresh answers from the
+     * old ones: a row whose last answer is older wears its number struck through until
+     * the sweep answers it. Null while no sweep runs (a single balancer's own sweep
+     * doesn't stamp — it asks one row, not the list).
+     */
+    val pingStartedAt: Long? = null,
+    /**
+     * The profiles a single ask is measuring right now — a menu ping, a balancer's
+     * targeted sweep. Each asked row wears its old answer struck through until the
+     * fresh one lands, so the ask is never mistaken for being ignored.
+     */
+    val pingingIds: Set<String> = emptySet(),
     /** Whether the subscription is being fetched right now (the update button). */
     val isUpdating: Boolean = false,
     val error: String? = null,
@@ -445,6 +458,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val configurationMutex = Mutex()
     private var sweepJob: Job? = null
     private var sweepGeneration = 0L
+
+    /** The targeted sweep's single row, when the sweep is one balancer's own ask. */
+    private var sweepTargetProfileId: String? = null
     private var pingNetworkLost = false
     private val pingSemaphore = Semaphore(TunnelClient.MAX_PARALLEL_DELAY_TESTS)
     private val regularPingSemaphore = Semaphore(REGULAR_PING_CONCURRENCY)
@@ -1071,7 +1087,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sweepGeneration++
         sweepJob?.cancel()
         sweepJob = null
-        _servers.update { it.copy(isPinging = false) }
+        val target = sweepTargetProfileId
+        sweepTargetProfileId = null
+        _servers.update {
+            it.copy(
+                isPinging = false,
+                pingStartedAt = null,
+                pingingIds = if (target == null) it.pingingIds else it.pingingIds - target,
+            )
+        }
     }
 
     private fun startServerSweep(onlyUntested: Boolean, targetProfileId: String? = null) {
@@ -1083,7 +1107,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val subscriptionId = selectedSubscriptionId.value?.takeUnless { it == STANDALONE_SUBSCRIPTION_ID }
         val generation = ++sweepGeneration
         sweepJob?.cancel()
-        _servers.update { it.copy(isPinging = true) }
+        // A new sweep takes over whatever the old one was asking: the old target's
+        // strike comes off (the new sweep answers it, or the ask was abandoned),
+        // the new target's goes on.
+        val previousTarget = sweepTargetProfileId
+        sweepTargetProfileId = targetProfileId
+        _servers.update {
+            val cleared = if (previousTarget == null) it.pingingIds else it.pingingIds - previousTarget
+            it.copy(
+                isPinging = true,
+                // A full sweep stamps its start: every answer older than the stamp is the
+                // last one standing, and the rows strike it through until their own fresh
+                // one lands. A balancer's single-target sweep asks its members alone.
+                pingStartedAt = if (targetProfileId == null) System.currentTimeMillis() else it.pingStartedAt,
+                pingingIds = if (targetProfileId == null) cleared else cleared + targetProfileId,
+            )
+        }
         sweepJob = viewModelScope.launch {
             try {
                 val testUrl = connection.value.delayTestUrl
@@ -1159,7 +1198,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             catch (e: Exception) {
                 if (generation == sweepGeneration) _servers.update { it.copy(error = e.message ?: app.getString(R.string.error_unknown)) }
             } finally {
-                if (generation == sweepGeneration) _servers.update { it.copy(isPinging = false) }
+                if (generation == sweepGeneration) {
+                    sweepTargetProfileId = null
+                    _servers.update { s ->
+                        s.copy(
+                            isPinging = false,
+                            pingStartedAt = null,
+                            pingingIds = if (targetProfileId == null) s.pingingIds else s.pingingIds - targetProfileId,
+                        )
+                    }
+                }
             }
         }
     }
@@ -1187,6 +1235,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         individualPings[id]?.cancel()
+        // The ask says so on the row itself: its old answer wears the strike until
+        // the fresh one lands.
+        _servers.update { it.copy(pingingIds = it.pingingIds + id) }
         individualPings[id] = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
                 val delay = regularPingSemaphore.withPermit {
@@ -1194,7 +1245,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 repository.setProfileDelay(id, delay, System.currentTimeMillis())
             } finally {
-                if (individualPings[id] == currentCoroutineContext()[Job]) individualPings.remove(id)
+                if (individualPings[id] == currentCoroutineContext()[Job]) {
+                    individualPings.remove(id)
+                    _servers.update { s -> s.copy(pingingIds = s.pingingIds - id) }
+                }
             }
         }
         individualPings[id]?.start()

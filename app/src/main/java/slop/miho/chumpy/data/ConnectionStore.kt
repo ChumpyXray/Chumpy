@@ -68,6 +68,9 @@ object ConnectionStore {
         val updated = transform(settings(context).value)
         write(context, updated)
         state.value = updated
+        // The launcher orb shows the selection and its pins; a write here is its
+        // repaint telling.
+        slop.miho.chumpy.widget.OrbWidget.tell(context)
     }
 
     /**

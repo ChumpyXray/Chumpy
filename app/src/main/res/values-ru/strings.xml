@@ -76,6 +76,7 @@
     <string name="config_delete_title">Удалить этот конфиг?</string>
     <string name="subscription_delete_title">Удалить эту подписку?</string>
     <string name="card_menu_pin">Закрепить</string>
+    <string name="card_menu_ping">Ping</string>
     <string name="card_menu_unpin">Открепить</string>
     <string name="card_menu_pinned">Закреплён</string>
     <string name="card_menu_hide">Скрыть</string>
@@ -86,8 +87,9 @@
     <string name="card_menu_yes">Да</string>
     <string name="card_menu_no">Нет</string>
 
-    <string name="happ_title">Маскировка под Happ</string>
-    <string name="happ_active">Включено</string>
+    <string name="spoof_title">Спуффер</string>
+    <string name="spoof_as_happ">Маскировка под Happ</string>
+    <string name="spoof_as_incy">Маскировка под INCY</string>
     <string name="happ_edit">Изменить данные маскировки</string>
     <string name="happ_app_version">Версия приложения</string>
     <string name="happ_os">ОС</string>
@@ -321,12 +323,21 @@
     <string name="error_geodata_source_missing">В базе %1$s нет категорий %2$s, а подписка не указала адрес их загрузки. Обновите подписку или запросите базу у провайдера.</string>
     <string name="error_geodata_categories">База провайдера не содержит нужных категорий: %1$s.</string>
     <string name="error_geodata_download">Не удалось подготовить базу маршрутизации подписки: %1$s</string>
+
+    <!-- Виджет на рабочем столе (шар) -->
+    <string name="widget_name">Chumpy</string>
+    <string name="widget_description">Шар подключения: подключение, переключение закреплённых серверов и состояние.</string>
+    <string name="widget_connect">Подключить</string>
+    <string name="widget_disconnect">Отключить</string>
+    <string name="widget_setup">Настроить Chumpy</string>
+    <string name="widget_empty">Сервера ещё нет</string>
     <string name="per_app_search">Поиск приложений</string>
     <string name="per_app_search_empty">Приложения не найдены</string>
     <string name="subscription_link_title">Добавить подписку?</string>
     <string name="local_network_permission_required">Разрешите доступ к устройствам поблизости, чтобы принимать файлы с телефона.</string>
     <string name="subscription_support">Поддержка</string>
     <string name="subscription_website">Сайт подписки</string>
+    <string name="subscription_announcement">Анонс подписки</string>
     <string name="server_ping_action">Проверить пинг сервера</string>
     <string name="tunnel_error_port_busy">Локальный порт занят. Закройте другие VPN или прокси-приложения и попробуйте снова.</string>
     <string name="tunnel_error_geodata">Не удалось загрузить базы маршрутизации. Обновите подписку и попробуйте снова.</string>
