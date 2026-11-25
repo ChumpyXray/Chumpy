@@ -69,7 +69,8 @@ internal object GeodataFiles {
     ): String = mutex.withLock {
         val root = json.parseToJsonElement(config) as JsonObject
         val refs = references(root)
-        val urls = GeodataSources.parse(sources) + sourceOverrides
+        val providerUrls = GeodataSources.parse(sources)
+        val urls = providerUrls.values.associateBy { GeodataSources.filenameFor(it) } + providerUrls + sourceOverrides
         val directory = File(context.filesDir, "xray_assets").apply { mkdirs() }
         val replacements = mutableMapOf<String, String>()
         for ((name, requested) in refs.groupBy { it.file }) {
@@ -105,7 +106,7 @@ internal object GeodataFiles {
                         temporary.delete()
                     }
                 }
-                replacements[name] = selectedGeodata(catalog, sourceHash, categories, directory).name
+                replacements[name] = selectedGeodata(catalog, "$sourceHash:${catalog.length()}:${catalog.lastModified()}", categories, directory).name
                 continue
             }
             if (url == null) {
@@ -243,7 +244,10 @@ internal object GeodataFiles {
         val selectedFile = File(directory, "selected-$selectedHash.dat")
         val cached = selectedFile.isFile && selectedFile.length() in 1..MAX_BYTES &&
             runCatching { selectedFile.inputStream().use { categories(it).containsAll(selectedCategories) } }.getOrDefault(false)
-        if (cached) return selectedFile
+        if (cached) {
+            selectedFile.setLastModified(System.currentTimeMillis())
+            return selectedFile
+        }
 
         val temporary = File.createTempFile("selected-", ".part", directory)
         try {
