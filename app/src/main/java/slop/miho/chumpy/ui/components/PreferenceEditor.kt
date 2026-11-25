@@ -64,13 +64,13 @@ internal fun PreferenceSection(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 internal fun PreferenceField(label: String, value: String, onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier, singleLine: Boolean = true, minLines: Int = 1) {
+    singleLine: Boolean = true, minLines: Int = 1) {
     val requester = remember { BringIntoViewRequester() }
     var focused by remember { mutableStateOf(false) }
     val ime = WindowInsets.ime.getBottom(LocalDensity.current)
     LaunchedEffect(focused, ime) { if (focused && ime > 0) requester.bringIntoView() }
     Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier.fillMaxWidth()) {
+        modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             BasicTextField(value = value, onValueChange = onValueChange, singleLine = singleLine, minLines = minLines,
