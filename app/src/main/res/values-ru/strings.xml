@@ -385,4 +385,6 @@
     <string name="request_off">Выключено</string>
     <string name="request_send">Отправлять</string>
     <string name="request_omit">Не отправлять</string>
+    <string name="custom_routing_save">Сохранить правила</string>
+    <string name="custom_routing_https_required">Нужны HTTPS-ссылки без логина и пароля в адресе.</string>
 </resources>

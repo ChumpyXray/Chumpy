@@ -2,6 +2,9 @@ package slop.miho.chumpy.ui.routing
 
 import android.net.Uri
 import android.os.Bundle
+import androidx.activity.viewModels
+import androidx.lifecycle.ViewModel
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -74,19 +77,33 @@ private val geodataPresets = listOf(
 )
 
 /** The custom domain/IP rules and the optional user-supplied Xray geodata databases. */
+internal class RoutingDraft : ViewModel() {
+    var value by mutableStateOf<CustomRouting?>(null)
+}
+
 class CustomRoutingActivity : ControllerActivity() {
+    private val draft by viewModels<RoutingDraft>()
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (draft.value == null) draft.value = ConnectionStore.settings(this).value.customRouting
         setContent {
             val ui by slop.miho.chumpy.data.SettingsStore.settings(this).collectAsStateWithLifecycle()
             val connection by ConnectionStore.settings(this).collectAsStateWithLifecycle()
+            val scope = rememberCoroutineScope()
             ChumpyTheme(settings = ui) {
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     CustomRoutingScreen(
-                        value = connection.customRouting,
+                        value = draft.value ?: connection.customRouting,
+                        dirty = draft.value != connection.customRouting,
+                        onSave = {
+                            val saved = draft.value ?: return@CustomRoutingScreen
+                            scope.launch { withContext(Dispatchers.IO) {
+                                ConnectionStore.update(this@CustomRoutingActivity) { it.copy(customRouting = saved) }
+                            } }
+                        },
                         onBack = ::finish,
-                        onChange = { value -> ConnectionStore.update(this) { it.copy(customRouting = value) } },
+                        onChange = { value -> draft.value = value },
                     )
                 }
             }
@@ -95,7 +112,7 @@ class CustomRoutingActivity : ControllerActivity() {
 }
 
 @Composable
-private fun CustomRoutingScreen(value: CustomRouting, onBack: () -> Unit, onChange: (CustomRouting) -> Unit) {
+private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: () -> Unit, onBack: () -> Unit, onChange: (CustomRouting) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val currentValue by androidx.compose.runtime.rememberUpdatedState(value)
@@ -292,6 +309,15 @@ private fun CustomRoutingScreen(value: CustomRouting, onBack: () -> Unit, onChan
             }
         }
         notice?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = dirty && !importing,
+            onClick = {
+                val valid = listOf(value.geositeUrl, value.geoipUrl).all { raw ->
+                    raw.isBlank() || raw.trim().toHttpUrlOrNull()?.let {
+                        it.isHttps && it.username.isEmpty() && it.password.isEmpty()
+                    } == true
+                }
+                if (valid) onSave() else notice = context.getString(R.string.custom_routing_https_required)
+            }) { Text(stringResource(R.string.custom_routing_save)) }
     }
 }
 

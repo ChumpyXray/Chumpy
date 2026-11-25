@@ -402,4 +402,6 @@
     <string name="request_off">Off</string>
     <string name="request_send">Send</string>
     <string name="request_omit">Omit</string>
+    <string name="custom_routing_save">Save rules</string>
+    <string name="custom_routing_https_required">Use HTTPS links without a username or password.</string>
 </resources>
