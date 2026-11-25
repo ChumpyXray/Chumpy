@@ -22,6 +22,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import slop.miho.chumpy.Graph
+import slop.miho.chumpy.sub.HappSpoof
+import slop.miho.chumpy.sub.HappSpoof.happFingerprint
+import slop.miho.chumpy.data.UiSettings
 import slop.miho.chumpy.data.SettingsStore
 import slop.miho.chumpy.db.SubscriptionRequestSettings
 import slop.miho.chumpy.data.SpoofMode
@@ -44,6 +47,7 @@ class SubscriptionRequestActivity : ControllerActivity() {
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     RequestSettingsScreen(
                         initial = null,
+                        global = ui,
                         onBack = ::finish,
                         load = { id?.let { Graph.subscriptions.subscriptionById(it)?.requestSettings } ?: SubscriptionRequestSettings() },
                         save = { settings -> if (id != null) Graph.subscriptions.setSubscriptionRequestSettings(id, settings) },
@@ -57,6 +61,7 @@ class SubscriptionRequestActivity : ControllerActivity() {
 @Composable
 private fun RequestSettingsScreen(
     initial: SubscriptionRequestSettings?,
+    global: UiSettings,
     onBack: () -> Unit,
     load: suspend () -> SubscriptionRequestSettings,
     save: suspend (SubscriptionRequestSettings) -> Unit,
@@ -92,9 +97,15 @@ private fun RequestSettingsScreen(
             }
         }
     }
+    val effectiveMode = value.spoofMode ?: global.spoofMode
+    val base = global.copy(spoofMode = if (global.spoofMode == SpoofMode.OFF) SpoofMode.HAPP else global.spoofMode)
+        .happFingerprint()!!
+    val effective = HappSpoof.override(global.happFingerprint(), value.copy(
+        spoofMode = if (effectiveMode == SpoofMode.OFF) SpoofMode.HAPP else effectiveMode,
+    ), base)!!
+    val userAgent = HappSpoof.headers(effective).getValue("User-Agent")
     PreferenceEditor(R.string.subscription_request_title, onBack) {
         if (failure) Text(stringResource(R.string.request_save_error), color = MaterialTheme.colorScheme.error)
-        Text(stringResource(R.string.request_inherit_hint), style = MaterialTheme.typography.bodyMedium)
         PreferenceSection {
         Text(stringResource(R.string.request_client), style = MaterialTheme.typography.titleMedium)
         ChoiceRow(
@@ -111,14 +122,14 @@ private fun RequestSettingsScreen(
             onSelect = { index -> commit(value.copy(sendHwid = when (index) { 0 -> null; 1 -> true; else -> false })) },
         )
         }
-        RequestField("User-Agent", value.userAgent) { commit(value.copy(userAgent = it)) }
-        RequestField(stringResource(R.string.happ_app_version), value.appVersion) { commit(value.copy(appVersion = it)) }
-        RequestField(stringResource(R.string.happ_user_id), value.userId) { commit(value.copy(userId = it)) }
-        RequestField(stringResource(R.string.happ_hwid), value.hwid) { commit(value.copy(hwid = it)) }
-        RequestField(stringResource(R.string.happ_os), value.os) { commit(value.copy(os = it)) }
-        RequestField(stringResource(R.string.happ_os_version), value.osVersion) { commit(value.copy(osVersion = it)) }
-        RequestField(stringResource(R.string.happ_device_model), value.deviceModel) { commit(value.copy(deviceModel = it)) }
-        RequestField(stringResource(R.string.happ_locale), value.locale) { commit(value.copy(locale = it)) }
+        RequestField("User-Agent", value.userAgent ?: userAgent) { commit(value.copy(userAgent = it)) }
+        RequestField(stringResource(R.string.happ_app_version), value.appVersion ?: effective.appVersion) { commit(value.copy(appVersion = it)) }
+        RequestField(stringResource(R.string.happ_user_id), value.userId ?: effective.userId) { commit(value.copy(userId = it)) }
+        RequestField(stringResource(R.string.happ_hwid), value.hwid ?: effective.hwid) { commit(value.copy(hwid = it)) }
+        RequestField(stringResource(R.string.happ_os), value.os ?: effective.os) { commit(value.copy(os = it)) }
+        RequestField(stringResource(R.string.happ_os_version), value.osVersion ?: effective.osVersion) { commit(value.copy(osVersion = it)) }
+        RequestField(stringResource(R.string.happ_device_model), value.deviceModel ?: effective.deviceModel) { commit(value.copy(deviceModel = it)) }
+        RequestField(stringResource(R.string.happ_locale), value.locale ?: effective.locale) { commit(value.copy(locale = it)) }
     }
 }
 
