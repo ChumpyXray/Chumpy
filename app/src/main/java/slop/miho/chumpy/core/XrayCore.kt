@@ -6,9 +6,9 @@ import android.os.RemoteException
 import android.os.SystemClock
 import android.util.Log
 import go.Seq
-import libv2ray.CoreCallbackHandler
-import libv2ray.CoreController
-import libv2ray.Libv2ray
+import cc.chumpy.cucore.LogSink
+import cc.chumpy.cucore.Controller
+import cc.chumpy.cucore.Cucore
 import java.io.File
 import java.security.SecureRandom
 import androidx.core.content.edit
@@ -16,18 +16,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import slop.miho.chumpy.data.DailyTrafficStore
+import slop.miho.chumpy.xray.NaiveTunnelConfig
 
-/**
- * Owner of the Xray core (the gomobile bindings of 2dust/AndroidLibXrayLite). Lives only in
- * the ":core" process, which stays alive while the VPN is up, independently of the UI — and
- * can also be spun up bound-only, purely to answer [measureOutboundDelay] pings.
- *
- * The controller itself is created once and driven with startLoop/stopLoop; those calls and
- * every state change run on the single worker thread, like the wireguard backend before it.
- * [measureOutboundDelay] is a native static and safe to call concurrently from binder threads
- * (v2rayNG does exactly that from its speedtest worker pool); it waits for the one-time
- * environment init to finish first.
- */
 object XrayCore {
     private const val TAG = "Chumpy/XrayCore"
 
@@ -49,6 +39,7 @@ object XrayCore {
     private var logChars = 0
 
     private lateinit var appContext: Context
+    private var assetDirectory = ASSET_DIR
 
     /** The core's own worker: init, start/stop loop and stats queries queue here. */
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "xray-worker") }
@@ -60,7 +51,8 @@ object XrayCore {
     private var initFailed: String? = null
 
     @Volatile
-    private var controller: CoreController? = null
+    private var controller: Controller? = null
+    private var naiveController: Controller? = null
 
     @Volatile private var terminating = false
 
@@ -123,20 +115,9 @@ object XrayCore {
     private var lastDailyFlush = 0L
     private var lastUiTrafficAt = 0L
 
-    private val coreCallback = object : CoreCallbackHandler {
-        override fun startup(): Long {
-            log(Log.INFO, "Core startup")
-            return 0
-        }
-
-        override fun shutdown(): Long {
-            log(Log.INFO, "Core shutdown")
-            return 0
-        }
-
-        override fun onEmitStatus(l: Long, s: String?): Long {
-            if (!s.isNullOrBlank()) log(Log.DEBUG, "Core: $s")
-            return 0
+    private val coreLogSink = object : LogSink {
+        override fun writeLine(line: String?) {
+            if (!line.isNullOrBlank()) log(Log.DEBUG, "Core: $line")
         }
     }
 
@@ -144,9 +125,10 @@ object XrayCore {
      * Idempotent, safe from any process start path. The UI process never calls it: it is
      * invoked from [ChumpyVpnService] and the app's ":core" fork in [slop.miho.chumpy.ChumpyApp].
      */
-    fun init(context: Context) {
+    fun init(context: Context, probeOnly: Boolean = false) {
         if (::appContext.isInitialized) return
         appContext = context.applicationContext
+        if (probeOnly) assetDirectory = "xray_probe_assets"
         try {
             Seq.setContext(appContext)
         } catch (e: Exception) {
@@ -155,8 +137,9 @@ object XrayCore {
         worker.execute {
             try {
                 copyGeoAssets()
-                Libv2ray.initCoreEnv(assetsDir().absolutePath, deviceId())
-                log(Log.INFO, "Xray core ${Libv2ray.checkVersionX()} environment ready")
+                Cucore.setLogSink(coreLogSink)
+                Cucore.initEnvironment(assetsDir().absolutePath, deviceId())
+                log(Log.INFO, "${Cucore.version()} environment ready")
             } catch (e: Exception) {
                 initFailed = e.message ?: e.javaClass.simpleName
                 log(Log.ERROR, "Failed to init core environment", e)
@@ -190,7 +173,7 @@ object XrayCore {
         }
     }
 
-    private fun assetsDir(): File = File(appContext.filesDir, ASSET_DIR)
+    private fun assetsDir(): File = File(appContext.filesDir, assetDirectory)
 
     private fun deviceId(): String {
         val prefs = appContext.getSharedPreferences("xray_identity", Context.MODE_PRIVATE)
@@ -209,17 +192,29 @@ object XrayCore {
     fun startLoop(configJson: String, fd: Int): Exception? {
         if (terminating) return IllegalStateException("Core shutdown is still pending")
         tunFd = fd
+        var bridgeCore: Controller? = null
         try {
             awaitInit()
             initFailed?.let { return IllegalStateException(it) }
-            val core = controller ?: Libv2ray.newCoreController(coreCallback).also { controller = it }
-            core.startLoop(configJson, fd)
+            val core = controller ?: Cucore.newController().also { controller = it }
+            val (sessionConfig, localPort) = LocalProxy.prepare(configJson)
+            val bridge = NaiveTunnelConfig.prepareBridge(sessionConfig)
+            if (bridge != null) {
+                bridgeCore = Cucore.newController()
+                bridgeCore.start("sing-box", bridge.singBox)
+            }
+            core.startTun(bridge?.xray ?: sessionConfig, fd.toLong())
+            naiveController = bridgeCore
+            LocalProxy.publish(localPort)
             synchronized(this) {
                 if (lastUiTrafficAt == 0L) lastUiTrafficAt = SystemClock.elapsedRealtime()
             }
             isRunning = true
+            val engine = if (bridgeCore == null) core.engine() else "xray + sing-box NaiveProxy"
+            log(Log.INFO, "VPN started ($engine)")
             return null
         } catch (e: Exception) {
+            bridgeCore?.let { runCatching { it.stop() } }
             isRunning = false
             return e
         }
@@ -243,11 +238,19 @@ object XrayCore {
             isRunning = false
             controller
         } ?: return
+        val bridgeCore = naiveController
+        naiveController = null
         val stopper = Thread {
             try {
-                core.stopLoop()
+                core.stop()
             } catch (e: Exception) {
                 log(Log.WARN, "stopLoop failed", e)
+            } finally {
+                try {
+                    bridgeCore?.stop()
+                } catch (e: Exception) {
+                    log(Log.WARN, "NaiveProxy shutdown failed", e)
+                }
             }
         }
         stopper.start()
@@ -295,7 +298,13 @@ object XrayCore {
         try {
             awaitInit()
             initFailed?.let { return -1L }
-            return DelayProbe.measure(testUrl) { target -> Libv2ray.measureOutboundDelay(configJson, target) }
+            return DelayProbe.measure(testUrl) { target ->
+                if (NaiveTunnelConfig.isProbe(configJson)) {
+                    Cucore.measureOutboundDelay(configJson, target)
+                } else {
+                    Cucore.measureXrayOutboundDelay(configJson, target)
+                }
+            }
         } catch (e: Exception) {
             log(Log.WARN, "measureOutboundDelay failed", e)
             return -1L
@@ -395,7 +404,7 @@ object XrayCore {
 
     fun coreVersion(): String = try {
         awaitInit()
-        Libv2ray.checkVersionX()
+        Cucore.version()
     } catch (_: Exception) {
         "unknown"
     }

@@ -138,10 +138,7 @@ kotlin {
 }
 
 dependencies {
-    // The Xray core: gomobile AAR of 2dust/AndroidLibXrayLite (a Xray fork with the
-    // Hysteria2 outbound), checked in under app/libs. Its consumer rules keep the
-    // go.Seq / libv2ray bindings alive through minification.
-    implementation(files("libs/libv2ray.aar"))
+    implementation(files(providers.gradleProperty("cuCoreAar").orElse("libs/cucore.aar").get()))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.exifinterface)

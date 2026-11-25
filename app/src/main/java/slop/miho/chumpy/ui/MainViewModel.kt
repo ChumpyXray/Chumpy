@@ -61,6 +61,7 @@ import slop.miho.chumpy.data.ConnectionSettings
 import slop.miho.chumpy.data.ConnectionStore
 import slop.miho.chumpy.data.DailyTraffic
 import slop.miho.chumpy.data.DailyTrafficStore
+import slop.miho.chumpy.ui.components.splitLeadingEmoji
 import slop.miho.chumpy.ui.components.splitLeadingFlag
 import slop.miho.chumpy.data.SettingsStore
 import slop.miho.chumpy.data.ServersSort
@@ -74,6 +75,7 @@ import slop.miho.chumpy.db.ProfileType
 import slop.miho.chumpy.db.STANDALONE_SUBSCRIPTION_ID
 import slop.miho.chumpy.db.SubscriptionEntity
 import slop.miho.chumpy.db.balancerMemberKeys
+import slop.miho.chumpy.db.displayLabel
 import slop.miho.chumpy.sub.SubscriptionRepository
 import slop.miho.chumpy.xray.XrayConfigBuilder
 import slop.miho.chumpy.xray.RoutingMode
@@ -86,6 +88,11 @@ data class HomeUiState(
     val profileLabel: String? = null,
     /** The flag emoji the selected profile's name begins with, if it does. */
     val profileFlag: String? = null,
+    /**
+     * The emoji the selected profile's name begins with past its flag, lifted into the
+     * card's icon slot as outlined stickers around the region tile (the setting's own).
+     */
+    val profileStickers: List<String> = emptyList(),
     /** Whether the active subscription's calendar has already run out — the red chip. */
     val subscriptionExpired: Boolean = false,
     /** Round-trip through the running tunnel, refreshed every 15 s while connected. */
@@ -741,8 +748,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val subscription = if (active != null) active.subscription else selectedSub
                 val profile = active?.profile ?: selected
                 // The flag panels put at the front of the name moves into the card's icon
-                // slot; the card's header says subscription first, region second.
-                val split = profile?.let { p -> splitLeadingFlag(p.remarks.ifEmpty { if (ui.maskAddresses) "" else p.server }) }
+                // slot; the card's header says subscription first, region second. The
+                // emoji past the flag ride along as stickers, the same way the server
+                // rows carry them, when the sticker setting is on.
+                val split = profile?.let { p -> splitLeadingFlag(p.displayLabel(ui.maskAddresses)) }
+                val (stickers, stripped) =
+                    if (ui.emojiStickers && split != null) splitLeadingEmoji(split.second)
+                    else emptyList<String>() to (split?.second ?: "")
                 // The addresses' curtain reaches Home too: a nameless server's card
                 // keeps the address out of sight — the region line stands empty
                 // rather than saying where it goes.
@@ -751,7 +763,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     it.copy(
                         subscriptionName = subscription?.name,
                         profileFlag = split?.first,
-                        profileLabel = split?.second?.ifEmpty { fallback },
+                        profileStickers = stickers,
+                        profileLabel = split?.let { stripped.ifEmpty { fallback } },
                         // The panel's calendar, read once per report: a subscription
                         // whose expiry has already passed wears the red chip.
                         subscriptionExpired = subscription != null &&
@@ -815,9 +828,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             .profilesOf(resolvedProfile.subscriptionId)
                             .first()
                         val resolved = rows.filter {
-                            it.type != ProfileType.BALANCER && it.linkKey in keys
+                            it.type != ProfileType.BALANCER && it.type != ProfileType.NAIVE && it.linkKey in keys
                         }
-                        resolved.ifEmpty { rows.filter { it.type != ProfileType.BALANCER } }
+                        resolved.ifEmpty { rows.filter { it.type != ProfileType.BALANCER && it.type != ProfileType.NAIVE } }
                     } else {
                         emptyList()
                     }
@@ -841,7 +854,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         requestContext.ensureActive()
                         if (generation == connectGeneration.get()) {
                             CoreConfigFile.write(app, config,
-                                resolvedProfile.remarks.ifEmpty { if (settings.value.maskAddresses) "" else resolvedProfile.server },
+                                resolvedProfile.displayLabel(settings.value.maskAddresses),
                                 subscriptionName, resolvedProfile.id, resolvedProfile.subscriptionId, resolvedProfile.server)
                             tunnelClient.connect()
                         }

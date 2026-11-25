@@ -105,7 +105,7 @@ class TunnelClient(context: Context) {
 
     /**
      * A real delay measurement through [configJson], performed by a one-off core instance
-     * in the ":core" process. Null when unreachable.
+     * in the ":probe" process. Null when unreachable.
      */
     suspend fun measureDelay(configJson: String, testUrl: String): Long? {
         val remote = service ?: return null

@@ -85,6 +85,8 @@ data class ConnectionSettings(
      * everything again. The core reads it fresh off disk when a tunnel starts.
      */
     val bypassLan: Boolean = true,
+    val randomLocalPort: Boolean = true,
+    val localProxyPort: Int = XrayConfigBuilder.LOCAL_SOCKS_PORT,
     /** The user's own routing lists and databases; off, the mode above decides alone. */
     val customRouting: CustomRouting = CustomRouting(),
 ) {
@@ -154,6 +156,9 @@ object ConnectionStore {
             bypassLan = json.optBoolean(KEY_BYPASS_LAN, true),
             customRouting = json.optJSONObject(KEY_CUSTOM_ROUTING)?.let(::customRoutingFromJson)
                 ?: CustomRouting(),
+            randomLocalPort = json.optBoolean("random_local_port", true),
+            localProxyPort = json.optInt("local_proxy_port", XrayConfigBuilder.LOCAL_SOCKS_PORT)
+                .takeIf { it in 1024..65535 } ?: XrayConfigBuilder.LOCAL_SOCKS_PORT,
         )
     }.getOrElse { read(context) }
 
@@ -183,6 +188,8 @@ object ConnectionStore {
             .put(KEY_AUTO_RECONNECT, settings.autoReconnect)
             .put(KEY_BYPASS_LAN, settings.bypassLan)
             .put(KEY_CUSTOM_ROUTING, customRoutingToJson(settings.customRouting))
+            .put("random_local_port", settings.randomLocalPort)
+            .put("local_proxy_port", settings.localProxyPort)
         AtomicSnapshot.write(snapshot(context), json.toString())
     }
 
@@ -212,6 +219,9 @@ object ConnectionStore {
             customRouting = prefs.getString(KEY_CUSTOM_ROUTING, null)
                 ?.let { runCatching { customRoutingFromJson(JSONObject(it)) }.getOrNull() }
                 ?: CustomRouting(),
+            randomLocalPort = prefs.getBoolean("random_local_port", true),
+            localProxyPort = prefs.getInt("local_proxy_port", XrayConfigBuilder.LOCAL_SOCKS_PORT)
+                .takeIf { it in 1024..65535 } ?: XrayConfigBuilder.LOCAL_SOCKS_PORT,
         )
     }
 
@@ -237,6 +247,8 @@ object ConnectionStore {
             .putBoolean(KEY_AUTO_RECONNECT, settings.autoReconnect)
             .putBoolean(KEY_BYPASS_LAN, settings.bypassLan)
             .putString(KEY_CUSTOM_ROUTING, customRoutingToJson(settings.customRouting).toString())
+            .putBoolean("random_local_port", settings.randomLocalPort)
+            .putInt("local_proxy_port", settings.localProxyPort)
             .apply()
     }
 

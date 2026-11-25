@@ -9,7 +9,10 @@ import java.io.File
 class ChumpyApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        if (currentProcessName().endsWith(":core")) {
+        slop.miho.chumpy.core.LocalProxy.init(this)
+        val processName = currentProcessName()
+        if (processName.endsWith(":probe")) return
+        if (processName.endsWith(":core")) {
             // The ":core" process can be started by the system alone (Always-on VPN, the
             // QS tile, or a bound-only measurement), so the core is initialised here rather
             // than on the first command. The UI process never loads it.

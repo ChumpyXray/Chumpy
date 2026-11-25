@@ -195,6 +195,11 @@
                 android:value="vpn" />
         </service>
 
+        <service
+            android:name=".core.LatencyProbeService"
+            android:exported="false"
+            android:process=":probe" />
+
         <!--
             Same ":core" process as the core, so the tile keeps toggling the VPN while
             the UI process is not running. Clicking without a config or VPN consent just

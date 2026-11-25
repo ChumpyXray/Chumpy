@@ -19,6 +19,7 @@ enum class ProfileType {
     /** Not a server: a routing balancer over the subscription's other profiles. */
     BALANCER,
     HTTP,
+    NAIVE,
 }
 
 /**
@@ -170,6 +171,11 @@ data class ProfileEntity(
      */
     val linkKey: String = "",
 )
+
+fun ProfileEntity.displayLabel(maskAddresses: Boolean): String {
+    val generatedNaiveName = type == ProfileType.NAIVE && remarks == "NaiveProxy · $server"
+    return if (remarks.isNotEmpty() && !generatedNaiveName) remarks else if (maskAddresses) "" else server
+}
 
 /** The canonical digest used for update diffing; see [linkKey]. */
 fun ProfileEntity.computeLinkKey(): String {

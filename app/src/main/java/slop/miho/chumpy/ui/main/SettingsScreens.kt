@@ -277,6 +277,20 @@ fun InterfaceScreen(
                         onSelect = { style -> onChange { it.copy(flagStyle = style) } },
                     )
                 },
+                // The stickers the flag row's style also dresses: the emoji a name
+                // begins with ride the region icon as outlined stickers, or stay
+                // plain title text.
+                {
+                    ToggleRow(
+                        title = stringResource(R.string.settings_emoji_stickers),
+                        supporting = stringResource(R.string.settings_emoji_stickers_hint),
+                        icon = R.drawable.ic_sticker,
+                        checked = settings.emojiStickers,
+                        onChange = { checked ->
+                            onChange { it.copy(emojiStickers = checked) }
+                        },
+                    )
+                },
             )
             // The navigation bar's own block: which bar, and its frost.
             val classicBar = classicNavigationBar()
@@ -1119,7 +1133,7 @@ fun ConnectionScreen(
                             R.string.connection_bypass_lan_off
                         },
                     ),
-                    icon = R.drawable.ic_home_storage,
+                    icon = R.drawable.ic_leak_add,
                     checked = connection.bypassLan,
                     onChange = { enabled ->
                         onChangeConnection { it.copy(bypassLan = enabled) }
@@ -1146,6 +1160,30 @@ fun ConnectionScreen(
                     checked = connection.autoReconnect,
                     onChange = { enabled ->
                         onChangeConnection { it.copy(autoReconnect = enabled) }
+                    },
+                )
+            },
+        )
+        SettingsGroup(
+            {
+                ToggleRow(
+                    title = stringResource(R.string.random_local_port),
+                    supporting = stringResource(R.string.local_port_reconnect),
+                    icon = R.drawable.ic_renew,
+                    checked = connection.randomLocalPort,
+                    onChange = { enabled -> onChangeConnection { it.copy(randomLocalPort = enabled) } },
+                )
+            },
+            {
+                var port by remember(connection.localProxyPort) { mutableStateOf(connection.localProxyPort.toString()) }
+                HappFieldRow(
+                    label = stringResource(R.string.local_proxy_port),
+                    value = port,
+                    onChange = { value ->
+                        port = value
+                        value.toIntOrNull()?.takeIf { it in 1024..65535 }?.let { valid ->
+                            onChangeConnection { it.copy(localProxyPort = valid) }
+                        }
                     },
                 )
             },

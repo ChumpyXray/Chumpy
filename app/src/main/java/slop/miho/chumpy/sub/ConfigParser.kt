@@ -76,7 +76,8 @@ object ConfigParser {
             is JsonObject -> listOf(root)
             else -> return null
         }
-        if (configs.none { it.array("outbounds") != null }) return null
+        val naiveProfiles = configs.mapNotNull(NaiveProxyImport::parse)
+        if (configs.none { it.array("outbounds") != null }) return naiveProfiles.ifEmpty { null }
         val singBoxProfiles = configs.flatMap(SingBoxOutbounds::parse)
 
         // One config's reading, tag and profile together.
@@ -148,7 +149,7 @@ object ConfigParser {
                 }
             }
         }
-        return (profiles + singBoxProfiles).ifEmpty { null }
+        return (profiles + singBoxProfiles + naiveProfiles).ifEmpty { null }
     }
 
     /**

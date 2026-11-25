@@ -89,6 +89,7 @@ import slop.miho.chumpy.ui.HomeUiState
 import slop.miho.chumpy.ui.UpdateUiState
 import slop.miho.chumpy.ui.components.ErrorCard
 import slop.miho.chumpy.ui.components.EmojiFlag
+import slop.miho.chumpy.ui.components.EmojiStickers
 import slop.miho.chumpy.ui.components.InfoChip
 import slop.miho.chumpy.ui.components.focusRing
 import slop.miho.chumpy.ui.components.rememberHapticDeniedKicks
@@ -252,6 +253,7 @@ fun HomeScreen(
                         subscription = home.subscriptionName,
                         title = title,
                         flag = home.profileFlag,
+                        stickers = home.profileStickers,
                         onClick = onOpenServers,
                     )
                 }
@@ -461,11 +463,20 @@ private fun formatUptime(millis: Long): String {
     return String.format(java.util.Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
 }
 
+/** What the server card's header swaps with: the text lines and the tile's own face. */
+private data class ServerCardFace(
+    val subscription: String?,
+    val title: String,
+    val flag: String?,
+    val stickers: List<String>,
+)
+
 @Composable
 private fun ServerCard(
     subscription: String?,
     title: String,
     flag: String?,
+    stickers: List<String>,
     onClick: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -491,31 +502,42 @@ private fun ServerCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colors.secondaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (flag != null && flagStyle != FlagStyle.GLOBE) {
-                    EmojiFlag(
-                        emoji = flag,
+            // The tile stands in an unclipped box of its own: the name's leading emoji
+            // ride its corners as stickers, over the tile's edge, and the tile's own
+            // rounding must not cut them off at the edge they hang past.
+            Box(modifier = Modifier.size(40.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.secondaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (flag != null && flagStyle != FlagStyle.GLOBE) {
+                        EmojiFlag(
+                            emoji = flag,
+                            twemoji = flagStyle == FlagStyle.TWEMOJI,
+                        )
+                    } else {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_public),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = colors.onSecondaryContainer,
+                        )
+                    }
+                }
+                if (stickers.isNotEmpty()) {
+                    EmojiStickers(
+                        emojis = stickers,
                         twemoji = flagStyle == FlagStyle.TWEMOJI,
-                    )
-                } else {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_public),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = colors.onSecondaryContainer,
                     )
                 }
             }
             // Switching the server swaps the header with a gentle fade/slide.
             val motion = MaterialTheme.motionScheme
             AnimatedContent(
-                targetState = Triple(subscription, title, flag),
+                targetState = ServerCardFace(subscription, title, flag, stickers),
                 transitionSpec = {
                     (fadeIn(motion.defaultEffectsSpec()) +
                         slideInVertically(motion.defaultSpatialSpec()) { it / 2 }) togetherWith
@@ -523,20 +545,20 @@ private fun ServerCard(
                 },
                 label = "server header",
                 modifier = Modifier.weight(1f),
-            ) { (sub, region, _) ->
+            ) { face ->
                 Column {
                     // First line: the subscription, the arrow marking the hop to the
                     // region under it; manual profiles have no subscription to name.
-                    if (sub != null) {
+                    if (face.subscription != null) {
                         Text(
-                            text = "$sub →",
+                            text = "${face.subscription} →",
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant,
                             maxLines = 1,
                         )
                     }
                     Text(
-                        text = region,
+                        text = face.title,
                         style = MaterialTheme.typography.titleMedium,
                         color = colors.onSurface,
                         maxLines = 1,

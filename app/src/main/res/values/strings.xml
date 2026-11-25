@@ -150,6 +150,8 @@
     <string name="settings_flag_twemoji" translatable="false">Twemoji</string>
     <string name="settings_flag_system">System emoji</string>
     <string name="settings_flag_globe">Just globe</string>
+    <string name="settings_emoji_stickers">Emoji as stickers</string>
+    <string name="settings_emoji_stickers_hint">A name\u2019s leading emoji ride its region icon as outlined stickers</string>
     <string name="settings_app_icon">App icon</string>
     <string name="settings_icon_chumpy" translatable="false">Chumpy</string>
     <string name="settings_icon_inverted">Inverted</string>
@@ -222,7 +224,7 @@
     <string name="connection_auto_reconnect">Auto-reconnect</string>
     <string name="connection_auto_reconnect_on">The tunnel comes back on its own wherever it fell</string>
     <string name="connection_auto_reconnect_off">A fall waits for the alert\'s Reconnect</string>
-    <string name="connection_bypass_lan">Bypass the local network</string>
+    <string name="connection_bypass_lan">Allow local network</string>
     <string name="connection_bypass_lan_on">LAN traffic rides the physical network, as if the VPN were off</string>
     <string name="connection_bypass_lan_off">Everything goes through the tunnel, the LAN included</string>
     <string name="settings_background_refresh">Background refresh</string>
@@ -230,7 +232,7 @@
         <item quantity="one">Auto-updates %d subscription</item>
         <item quantity="other">Auto-updates %d subscriptions</item>
     </plurals>
-    <string name="settings_about_core">Xray core</string>
+    <string name="settings_about_core">Core</string>
     <string name="settings_about_core_running">running</string>
     <string name="settings_about_core_not_running">stopped</string>
     <string name="settings_about_version">Version</string>
@@ -413,4 +415,7 @@
     <string name="custom_routing_loading_categories">Loading %1$s…</string>
     <string name="custom_routing_loading_percent">Loading %1$s: %2$d%%</string>
     <string name="subscription_request_pick">Choose a subscription</string>
+    <string name="random_local_port">Random local port</string>
+    <string name="local_proxy_port">Local SOCKS port (1024-65535)</string>
+    <string name="local_port_reconnect">Applies on the next VPN connection. Turn off random selection to use the specified port.</string>
 </resources>

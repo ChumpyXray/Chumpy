@@ -170,6 +170,8 @@
     <string name="settings_flag_style">Стиль флагов</string>
     <string name="settings_flag_system">Системные эмодзи</string>
     <string name="settings_flag_globe">Только глобус</string>
+    <string name="settings_emoji_stickers">Эмодзи как стикеры</string>
+    <string name="settings_emoji_stickers_hint">Начальные эмодзи имени висят стикерами вокруг значка региона</string>
     <string name="settings_app_icon">Иконка приложения</string>
     <string name="settings_icon_inverted">Инвертированная</string>
     <string name="settings_icon_dark">Тёмная</string>
@@ -209,7 +211,7 @@
     <string name="connection_auto_reconnect">Автопереподключение</string>
     <string name="connection_auto_reconnect_on">Туннель сам поднимается, где бы ни упал</string>
     <string name="connection_auto_reconnect_off">Когда туннель упадёт, мы просто отправим уведомление</string>
-    <string name="connection_bypass_lan">Не проксировать локальную сеть</string>
+    <string name="connection_bypass_lan">Разрешить локальную сеть</string>
     <string name="connection_bypass_lan_on">Локальный трафик идёт мимо VPN, как будто его нет</string>
     <string name="connection_bypass_lan_off">Всё идёт через туннель, включая локалку</string>
     <string name="settings_background_refresh">Фоновое обновление</string>
@@ -219,7 +221,7 @@
         <item quantity="many">Автообновление %d подписок</item>
         <item quantity="other">Автообновление %d подписки</item>
     </plurals>
-    <string name="settings_about_core">Ядро Xray</string>
+    <string name="settings_about_core">Ядро</string>
     <string name="settings_about_core_running">работает</string>
     <string name="settings_about_core_not_running">остановлено</string>
     <string name="settings_about_version">Версия</string>
@@ -410,4 +412,7 @@
     <string name="custom_routing_loading_categories">Загрузка %1$s…</string>
     <string name="custom_routing_loading_percent">Загрузка %1$s: %2$d%%</string>
     <string name="subscription_request_pick">Выберите подписку</string>
+    <string name="random_local_port">Случайный локальный порт</string>
+    <string name="local_proxy_port">Локальный SOCKS-порт (1024-65535)</string>
+    <string name="local_port_reconnect">Применяется при следующем подключении VPN. Отключите случайный выбор, чтобы использовать указанный порт.</string>
 </resources>

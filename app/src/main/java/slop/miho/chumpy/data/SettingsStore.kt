@@ -146,6 +146,12 @@ data class UiSettings(
     val fontId: String = FontRegistry.INTER_ID,
     /** How the server list draws each exit's country. */
     val flagStyle: FlagStyle = FlagStyle.TWEMOJI,
+    /**
+     * Whether the emoji a profile's name begins with (past its flag) ride the region
+     * icon as outlined stickers instead of staying part of the title text. Emoji in
+     * the middle or at the end of a name are the title's own — never touched.
+     */
+    val emojiStickers: Boolean = true,
     /** The launcher icon variant; see [IconVariant]. */
     val iconVariant: IconVariant = IconVariant.CHUMPY,
     /** The CUSTOM accent's own color, as an ARGB int (alpha always opaque). */
@@ -344,6 +350,7 @@ object SettingsStore {
             happSendHwid = prefs.getBoolean(KEY_HAPP_SEND_HWID, true),
             fontId = prefs.getString(KEY_FONT, null) ?: FontRegistry.INTER_ID,
             flagStyle = enumEntry(prefs.getString(KEY_FLAG_STYLE, null), FlagStyle.TWEMOJI),
+            emojiStickers = prefs.getBoolean(KEY_EMOJI_STICKERS, true),
             iconVariant = enumEntry(prefs.getString(KEY_ICON_VARIANT, null), IconVariant.CHUMPY),
             customAccent = prefs.getInt(KEY_CUSTOM_ACCENT, 0xFF6FACED.toInt()),
             wallpaperDim = prefs.getFloat(KEY_WALLPAPER_DIM, 0.4f),
@@ -400,6 +407,7 @@ object SettingsStore {
             .putBoolean(KEY_HAPP_SEND_HWID, settings.happSendHwid)
             .putString(KEY_FONT, settings.fontId)
             .putString(KEY_FLAG_STYLE, settings.flagStyle.name)
+            .putBoolean(KEY_EMOJI_STICKERS, settings.emojiStickers)
             .putString(KEY_ICON_VARIANT, settings.iconVariant.name)
             .putInt(KEY_CUSTOM_ACCENT, settings.customAccent)
             .putFloat(KEY_WALLPAPER_DIM, settings.wallpaperDim)
@@ -477,6 +485,7 @@ object SettingsStore {
     private const val KEY_HAPP_SEND_HWID = "happ_send_hwid"
     private const val KEY_FONT = "font"
     private const val KEY_FLAG_STYLE = "flag_style"
+    private const val KEY_EMOJI_STICKERS = "emoji_stickers"
     private const val KEY_ICON_VARIANT = "icon_variant"
     private const val KEY_CUSTOM_ACCENT = "custom_accent"
     private const val KEY_WALLPAPER_DIM = "wallpaper_dim"
