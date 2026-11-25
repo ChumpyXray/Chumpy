@@ -715,15 +715,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val lastSeen = prefs.getLong("version_code", 0L)
             if (lastSeen >= versionCode) return@launch
             val pending = repository.subscriptions().first()
-            if (lastSeen == 0L && pending.isEmpty()) {
-                prefs.edit { putLong("version_code", versionCode) }
-                return@launch
+            refreshSubscriptionsForUpgrade(prefs, versionCode, pending.map { it.id }) { id ->
+                repository.updateSubscription(id).isSuccess
             }
-            var succeeded = true
-            pending.forEach { subscription ->
-                if (repository.updateSubscription(subscription.id).isFailure) succeeded = false
-            }
-            if (succeeded) prefs.edit { putLong("version_code", versionCode) }
         }
     }
 
@@ -1587,6 +1581,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fun trimLossBuckets(buckets: List<LossBucket>): List<LossBucket> {
             val cutoff = System.currentTimeMillis() - STATS_WINDOW_MILLIS
             return buckets.dropWhile { it.atMillis < cutoff }
+        }
+    }
+}
+
+internal suspend fun refreshSubscriptionsForUpgrade(
+    prefs: android.content.SharedPreferences,
+    versionCode: Long,
+    subscriptionIds: List<String>,
+    refresh: suspend (String) -> Boolean,
+) {
+    if (prefs.getLong("version_code", 0L) >= versionCode) return
+    val completed = if (prefs.getLong("pending_version_code", 0L) == versionCode) {
+        prefs.getStringSet("completed_subscriptions", emptySet()).orEmpty().intersect(subscriptionIds.toSet()).toMutableSet()
+    } else mutableSetOf()
+    for (id in subscriptionIds) {
+        currentCoroutineContext().ensureActive()
+        if (id in completed || !refresh(id)) continue
+        completed.add(id)
+        if (!prefs.edit().putLong("pending_version_code", versionCode)
+                .putStringSet("completed_subscriptions", completed.toSet()).commit()) {
+            Log.w("Chumpy/Upgrade", "Could not save subscription refresh progress")
+            return
+        }
+    }
+    currentCoroutineContext().ensureActive()
+    if (completed.containsAll(subscriptionIds)) {
+        if (!prefs.edit().putLong("version_code", versionCode)
+                .remove("pending_version_code").remove("completed_subscriptions").commit()) {
+            Log.w("Chumpy/Upgrade", "Could not save completed parser upgrade")
         }
     }
 }
