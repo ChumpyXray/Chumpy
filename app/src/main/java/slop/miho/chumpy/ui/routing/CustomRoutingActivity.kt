@@ -240,8 +240,6 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
         }
     }
     PreferenceEditor(R.string.custom_routing_title, onBack) {
-        Text(stringResource(R.string.custom_routing_chain_hint), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
         PreferenceSection {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
