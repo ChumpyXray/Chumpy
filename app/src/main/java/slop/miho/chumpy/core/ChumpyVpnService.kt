@@ -726,13 +726,16 @@ class ChumpyVpnService : VpnService() {
                 // shape: fail loudly rather than quietly proxying the whole phone.
                 val picked = packages - packageName
                 if (picked.isEmpty()) throw IllegalStateException(getString(R.string.per_app_only_empty))
+                var allowedCount = 0
                 picked.forEach { pkg ->
                     try {
                         builder.addAllowedApplication(pkg)
+                        allowedCount++
                     } catch (e: PackageManager.NameNotFoundException) {
                         Log.w(TAG, "Proxied app not found: $pkg")
                     }
                 }
+                if (allowedCount == 0) throw IllegalStateException(getString(R.string.per_app_only_empty))
             }
         }
         return builder.establish()
