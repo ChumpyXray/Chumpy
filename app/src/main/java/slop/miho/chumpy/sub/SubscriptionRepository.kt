@@ -192,7 +192,8 @@ class SubscriptionRepository(
 
     suspend fun fetchCustomGeodata(url: String, target: java.io.File) = fetcher.fetchGeodata(url, target)
 
-    suspend fun fetchCustomGeodataCatalog(url: String, target: java.io.File) = fetcher.fetchGeodataCatalog(url, target)
+    suspend fun fetchCustomGeodataCatalog(url: String, target: java.io.File, onProgress: (Int?) -> Unit = {}) =
+        fetcher.fetchGeodataCatalogWithProgress(url, target, onProgress)
 
     suspend fun deleteSubscription(id: String) = withContext(Dispatchers.IO) {
         subscriptions.delete(id)

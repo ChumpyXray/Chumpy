@@ -119,6 +119,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
     val scope = rememberCoroutineScope()
     val currentValue by androidx.compose.runtime.rememberUpdatedState(value)
     var importing by remember { mutableStateOf(false) }
+    var downloadPercent by remember { mutableStateOf<Int?>(null) }
     var loadingSource by remember { mutableStateOf<CategorySource?>(null) }
     var importGeoip by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
@@ -158,6 +159,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
             notice = resources.getString(R.string.custom_routing_https_required)
             return
         }
+        downloadPercent = null
         loadingSource = source
         notice = null
         scope.launch {
@@ -167,7 +169,9 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                     val target = GeodataFiles.catalogFile(context, url)
                     val temporary = File.createTempFile("catalog-", ".part", target.parentFile)
                     try {
-                        Graph.subscriptions.fetchCustomGeodataCatalog(url, temporary)
+                        Graph.subscriptions.fetchCustomGeodataCatalog(url, temporary) { percent ->
+                            scope.launch { downloadPercent = percent }
+                        }
                         val names = temporary.inputStream().use {
                             GeodataFiles.categories(it, GeodataFiles.MAX_SOURCE_BYTES).toList().sorted()
                         }
@@ -315,10 +319,12 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(8.dp))
                     }
-                    Text(stringResource(
+                    val name = if (source == CategorySource.GEOSITE) "GeoSite" else "GeoIP"
+                    Text(if (loadingSource == source && downloadPercent != null) {
+                        stringResource(R.string.custom_routing_loading_percent, name, downloadPercent!!)
+                    } else stringResource(
                         if (loadingSource == source) R.string.custom_routing_loading_categories
-                        else R.string.custom_routing_load_categories,
-                        if (source == CategorySource.GEOSITE) "GeoSite" else "GeoIP"))
+                        else R.string.custom_routing_load_categories, name))
                 }
             }
         }

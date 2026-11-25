@@ -408,4 +408,5 @@
         <item quantity="other">VPN только для %1$d приложения</item>
     </plurals>
     <string name="custom_routing_loading_categories">Загрузка %1$s…</string>
+    <string name="custom_routing_loading_percent">Загрузка %1$s: %2$d%%</string>
 </resources>
