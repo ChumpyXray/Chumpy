@@ -19,7 +19,7 @@ enum class PerAppMode { OFF, BYPASS, ONLY }
 enum class CustomRouteStage { BLOCKED, DIRECT, PROXY }
 
 /**
- * A standalone routing policy: its ordered stages and final target replace all preset and
+ * A standalone routing policy: its ordered stages replace all preset and
  * panel routing when enabled. Database URLs override the bundled geodata sources.
  */
 data class CustomRouting(

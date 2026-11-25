@@ -292,10 +292,10 @@ object XrayConfigBuilder {
         val ips = mutableListOf<String>()
         entries.map(String::trim).filter(String::isNotEmpty).forEach { entry ->
             when {
-                entry.startsWith("geoip:", ignoreCase = true) -> ips += entry
-                entry.startsWith("geosite:", ignoreCase = true) -> domains += entry
+                entry.startsWith("geoip:", ignoreCase = true) -> ips += "geoip:" + entry.substring(6)
+                entry.startsWith("geosite:", ignoreCase = true) -> domains += "geosite:" + entry.substring(8)
                 entry.startsWith("ext:", ignoreCase = true) -> {
-                    val file = entry.removePrefix("ext:").substringBefore(':')
+                    val file = entry.substring(4).substringBefore(':')
                     if (file.contains("geoip", ignoreCase = true)) ips += entry else domains += entry
                 }
                 entry.startsWith("domain:", ignoreCase = true) ||
@@ -376,12 +376,8 @@ object XrayConfigBuilder {
                     }
                     rule {
                         put("network", "tcp,udp")
-                        when (customRouting.stageOrder.lastOrNull() ?: CustomRouteStage.PROXY) {
-                            CustomRouteStage.BLOCKED -> put("outboundTag", BLOCK_TAG)
-                            CustomRouteStage.DIRECT -> put("outboundTag", DIRECT_TAG)
-                            CustomRouteStage.PROXY -> if (balanced) put("balancerTag", BALANCER_TAG)
-                                else put("outboundTag", PROXY_TAG)
-                        }
+                        if (balanced) put("balancerTag", BALANCER_TAG)
+                        else put("outboundTag", PROXY_TAG)
                     }
                 } else {
                 mode.region?.let { region ->

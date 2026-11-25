@@ -141,7 +141,7 @@ class XrayConfigBuilderTest {
     }
 
     @Test
-    fun `enabled custom policy is exclusive and last stage handles unmatched traffic`() {
+    fun `enabled custom policy is exclusive and unmatched traffic uses the proxy`() {
         val rules = rulesOf(
             XrayConfigBuilder.buildFull(
                 profile,
@@ -161,7 +161,7 @@ class XrayConfigBuilderTest {
         assertEquals("proxy", rules[1]["outboundTag"]!!.jsonPrimitive.content)
         assertEquals("domain:direct.example", rules[2]["domain"]!!.jsonArray.single().jsonPrimitive.content)
         assertEquals("direct", rules[2]["outboundTag"]!!.jsonPrimitive.content)
-        assertEquals("direct", rules.last()["outboundTag"]!!.jsonPrimitive.content)
+        assertEquals("proxy", rules.last()["outboundTag"]!!.jsonPrimitive.content)
         assertTrue(rules.none { it["domain"]?.jsonArray?.any { it.jsonPrimitive.content == "geosite:private" } == true })
         assertTrue(rules.none { it["ip"]?.jsonArray?.any { it.jsonPrimitive.content == "geoip:ru" } == true })
     }
