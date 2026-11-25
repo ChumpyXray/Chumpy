@@ -70,7 +70,7 @@ internal object GeodataFiles {
         val root = json.parseToJsonElement(config) as JsonObject
         val refs = references(root)
         val providerUrls = GeodataSources.parse(sources)
-        val urls = providerUrls.values.associateBy { GeodataSources.filenameFor(it) } + providerUrls + sourceOverrides
+        val urls = providerUrls.values.associateBy { GeodataSources.filenameFor(it) } + sourceOverrides
         val directory = File(context.filesDir, "xray_assets").apply { mkdirs() }
         val replacements = mutableMapOf<String, String>()
         for ((name, requested) in refs.groupBy { it.file }) {

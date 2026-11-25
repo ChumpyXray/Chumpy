@@ -5,7 +5,20 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [28], application = android.app.Application::class)
 class GeodataFilesTest {
+    @Test
+    fun `provider databases do not replace bundled private network rules`() = kotlinx.coroutines.runBlocking {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val config = """{"routing":{"rules":[{"ip":["geoip:private"],"outboundTag":"direct"}]}}"""
+        val sources = """{"geoip.dat":"https://provider.example/geoip.dat"}"""
+        val result = GeodataFiles.prepare(context, config, sources, fetch = { _, _ ->
+            error("Built-in private networks must not be requested from the provider")
+        })
+        org.junit.Assert.assertTrue(result.contains("geoip:private"))
+    }
+
     @Test
     fun `geodata filtering keeps only selected category records`() {
         val source = ByteArrayOutputStream().apply {
