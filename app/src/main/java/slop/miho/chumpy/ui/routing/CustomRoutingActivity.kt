@@ -22,7 +22,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -226,29 +231,37 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
     PreferenceEditor(R.string.custom_routing_title, onBack) {
         Text(stringResource(R.string.custom_routing_chain_hint), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        PreferenceSection {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(slop.miho.chumpy.R.string.custom_routing_enabled), style = MaterialTheme.typography.bodyLarge)
             }
             Switch(value.enabled, onCheckedChange = { onChange(value.copy(enabled = it)) })
         }
+        }
+        PreferenceSection {
         Text(stringResource(slop.miho.chumpy.R.string.custom_routing_order), style = MaterialTheme.typography.titleMedium)
         Text(stringResource(R.string.custom_routing_last_stage_fallback), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         value.stageOrder.forEachIndexed { index, stage ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stageLabel(stage), modifier = Modifier.weight(1f))
-                Button(enabled = index > 0, onClick = {
+                FilledTonalIconButton(enabled = index > 0, onClick = {
                     val order = value.stageOrder.toMutableList()
                     java.util.Collections.swap(order, index, index - 1)
                     onChange(value.copy(stageOrder = order))
-                }) { Text("↑") }
-                Button(enabled = index < value.stageOrder.lastIndex, onClick = {
+                }) { Icon(painterResource(R.drawable.ic_chevron_right),
+                    contentDescription = stringResource(R.string.custom_routing_move_up, stageLabel(stage)),
+                    modifier = Modifier.size(24.dp).rotate(-90f)) }
+                FilledTonalIconButton(enabled = index < value.stageOrder.lastIndex, onClick = {
                     val order = value.stageOrder.toMutableList()
                     java.util.Collections.swap(order, index, index + 1)
                     onChange(value.copy(stageOrder = order))
-                }) { Text("↓") }
+                }) { Icon(painterResource(R.drawable.ic_chevron_right),
+                    contentDescription = stringResource(R.string.custom_routing_move_down, stageLabel(stage)),
+                    modifier = Modifier.size(24.dp).rotate(90f)) }
             }
+        }
         }
         EntryField(
             stringResource(slop.miho.chumpy.R.string.custom_routing_target_blocked), value.blocked,

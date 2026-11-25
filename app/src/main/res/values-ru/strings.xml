@@ -389,4 +389,6 @@
     <string name="custom_routing_https_required">Нужны HTTPS-ссылки без логина и пароля в адресе.</string>
     <string name="custom_routing_load_categories">Загрузить категории %1$s</string>
     <string name="request_save_error">Не удалось прочитать или сохранить настройки. См. логи.</string>
+    <string name="custom_routing_move_up">Поднять: %1$s</string>
+    <string name="custom_routing_move_down">Опустить: %1$s</string>
 </resources>

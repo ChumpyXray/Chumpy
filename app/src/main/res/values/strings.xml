@@ -406,4 +406,6 @@
     <string name="custom_routing_https_required">Use HTTPS links without a username or password.</string>
     <string name="custom_routing_load_categories">Load %1$s categories</string>
     <string name="request_save_error">Could not read or save settings. See logs.</string>
+    <string name="custom_routing_move_up">Move %1$s up</string>
+    <string name="custom_routing_move_down">Move %1$s down</string>
 </resources>

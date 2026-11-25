@@ -324,20 +324,11 @@ private fun AppsPage(
                         enabled = enabled,
                         onChange = onToggleEnabled,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = !onlyMode,
-                            onClick = { onOnlyModeChange(false) },
-                            label = { Text(stringResource(R.string.per_app_bypass_mode)) },
-                            modifier = Modifier.weight(1f),
-                        )
-                        FilterChip(
-                            selected = onlyMode,
-                            onClick = { onOnlyModeChange(true) },
-                            label = { Text(stringResource(R.string.per_app_only_mode)) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                    slop.miho.chumpy.ui.components.PreferenceChoices(
+                        labels = listOf(stringResource(R.string.per_app_bypass_mode), stringResource(R.string.per_app_only_mode)),
+                        selected = if (onlyMode) 1 else 0,
+                        onSelect = { onOnlyModeChange(it == 1) },
+                    )
                 }
             },
         ) {

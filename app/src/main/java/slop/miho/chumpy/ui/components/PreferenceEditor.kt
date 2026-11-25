@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -75,7 +76,7 @@ internal fun PreferenceField(label: String, value: String, onValueChange: (Strin
             BasicTextField(value = value, onValueChange = onValueChange, singleLine = singleLine, minLines = minLines,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = label }.onFocusChanged { focused = it.isFocused }
                     .bringIntoViewRequester(requester).focusRing(shape = RoundedCornerShape(8.dp)))
         }
     }
