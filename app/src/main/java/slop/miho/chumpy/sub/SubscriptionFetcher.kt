@@ -32,6 +32,7 @@ import slop.miho.chumpy.db.SubscriptionRequestSettings
 class SubscriptionFetcher(
     private val tunnelUp: () -> Boolean,
     private val happSpoof: () -> HappSpoof.Fingerprint?,
+    private val fallbackFingerprint: () -> HappSpoof.Fingerprint? = happSpoof,
 ) {
     private companion object {
         /**
@@ -89,7 +90,7 @@ class SubscriptionFetcher(
     private suspend fun fetchResponse(rawUrl: String, requestSettings: SubscriptionRequestSettings): FetchResult = suspendCancellableCoroutine { continuation ->
         val client = if (tunnelUp()) tunnelClient else directClient
         val request = Request.Builder().url(normalizeUrl(rawUrl)).get()
-        val fingerprint = HappSpoof.override(happSpoof(), requestSettings)
+        val fingerprint = HappSpoof.override(happSpoof(), requestSettings, fallbackFingerprint())
         if (fingerprint != null) HappSpoof.headers(fingerprint).forEach { (name, value) -> request.header(name, value) }
         else request.header("User-Agent", requestSettings.userAgent?.takeIf { it.isNotBlank() } ?: USER_AGENT)
             .header("Accept", "*/*")

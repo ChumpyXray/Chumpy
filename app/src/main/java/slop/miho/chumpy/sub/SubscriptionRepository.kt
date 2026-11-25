@@ -56,7 +56,12 @@ class SubscriptionRepository(
 
     private val refreshLocks = ConcurrentHashMap<String, Mutex>()
 
-    private val fetcher = SubscriptionFetcher(tunnelUp, happSpoof)
+    private val fetcher = SubscriptionFetcher(tunnelUp, happSpoof) {
+        with(HappSpoof) {
+            slop.miho.chumpy.data.SettingsStore.settings(this@SubscriptionRepository.context).value
+                .copy(spoofMode = slop.miho.chumpy.data.SpoofMode.HAPP).happFingerprint()
+        }
+    }
     private val subscriptions = db.subscriptionDao()
     private val profiles = db.profileDao()
 

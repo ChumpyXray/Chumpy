@@ -106,23 +106,15 @@ object HappSpoof {
     fun override(
         global: Fingerprint?,
         settings: slop.miho.chumpy.db.SubscriptionRequestSettings,
+        fallback: Fingerprint? = null,
     ): Fingerprint? {
-        val hasOverrides = settings.spoofMode != null || settings.appVersion != null || settings.userId != null ||
-            settings.hwid != null || settings.os != null || settings.osVersion != null ||
-            settings.deviceModel != null || settings.locale != null
-        if (global == null && !hasOverrides) return null
-        val mode = settings.spoofMode ?: if (global?.incy == true) SpoofMode.INCY else SpoofMode.HAPP
+        val mode = settings.spoofMode ?: when {
+            global == null -> SpoofMode.OFF
+            global.incy -> SpoofMode.INCY
+            else -> SpoofMode.HAPP
+        }
         if (mode == SpoofMode.OFF) return null
-        val base = global ?: Fingerprint(
-            appVersion = if (mode == SpoofMode.INCY) DEFAULT_INCY_APP_VERSION else DEFAULT_APP_VERSION,
-            os = DEFAULT_OS,
-            osVersion = defaultOsVersion(),
-            deviceModel = defaultDeviceModel(),
-            locale = DEFAULT_LOCALE,
-            userId = randomUserId(),
-            hwid = randomHwid(),
-            incy = mode == SpoofMode.INCY,
-        )
+        val base = global ?: fallback ?: return null
         val incy = mode == SpoofMode.INCY
         return base.copy(
             appVersion = settings.appVersion?.takeIf { it.isNotBlank() }
