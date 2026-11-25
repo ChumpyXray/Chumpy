@@ -1152,7 +1152,7 @@ fun ConnectionScreen(
         // The spoof's own block, between the carrying and the measuring. The header
         // carries two rows of its own, separated by the fold rows' own 2dp seam: the
         // picker ("Spoofer", with the picked client named beneath it — Happ's big
-        // italic H, INCY's own lowercase word, the crossed-out circle for going out
+        // official client marks, the crossed-out circle for going out
         // bare) and the strings' doorway beneath it — "Edit spoof strings" with the
         // background refresh's own triangle — so a working spoof sits compact, two
         // rows tall, and the fingerprint's seven fields ride folded behind the
@@ -1186,21 +1186,8 @@ fun ConnectionScreen(
                         title = stringResource(R.string.spoof_title),
                         showSelectedLabel = true,
                         options = listOf(
-                            IconChoice(R.string.spoof_as_happ, SpoofMode.HAPP) {
-                                // The Happ app's own mark: the bold upright H — the layout
-                                // box centers it on its own, whatever the typeface.
-                                Text(
-                                    text = "H",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            },
-                            IconChoice(R.string.spoof_as_incy, SpoofMode.INCY) {
-                                Text(
-                                    text = "INCY",
-                                    style = MaterialTheme.typography.titleSmall,
-                                )
-                            },
+                            IconChoice(R.drawable.ic_happ, R.string.spoof_as_happ, SpoofMode.HAPP),
+                            IconChoice(R.drawable.ic_incy, R.string.spoof_as_incy, SpoofMode.INCY),
                             IconChoice(R.drawable.ic_block, R.string.per_app_disabled, SpoofMode.OFF),
                         ),
                         selected = settings.spoofMode,
