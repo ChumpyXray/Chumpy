@@ -2,12 +2,31 @@ package slop.miho.chumpy.db
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import slop.miho.chumpy.data.SpoofMode
 
 /** The id the standalone group's row wears — the home of configs pasted outside any
  *  subscription. No row with this id stands in the subscriptions table; it is the
  *  dropdown's synthetic first entry, resolved to the manual profiles (whose
  *  subscriptionId is null) wherever a real id would be. */
 const val STANDALONE_SUBSCRIPTION_ID = "standalone"
+
+/**
+ * One subscription's request overrides. Null everywhere means "follow the global
+ * fingerprint"; a non-null field replaces that one header, and [sendHwid] false keeps
+ * the HWID out of the request entirely.
+ */
+data class SubscriptionRequestSettings(
+    val spoofMode: SpoofMode? = null,
+    val sendHwid: Boolean? = null,
+    val appVersion: String? = null,
+    val userAgent: String? = null,
+    val userId: String? = null,
+    val hwid: String? = null,
+    val os: String? = null,
+    val osVersion: String? = null,
+    val deviceModel: String? = null,
+    val locale: String? = null,
+)
 
 /**
  * One subscription: a URL whose body is a set of server links, plus the metadata panels
@@ -59,4 +78,34 @@ data class SubscriptionEntity(
     val supportUrl: String? = null,
     val webPageUrl: String? = null,
     val announcement: String? = null,
-)
+
+    // The per-subscription request overrides, one column each; null follows the global
+    // fingerprint in SettingsStore. The HWID switch is tri-state for the same reason.
+    val requestSpoofMode: String? = null,
+    val requestSendHwid: Boolean? = null,
+    val requestAppVersion: String? = null,
+    val requestUserAgent: String? = null,
+    val requestUserId: String? = null,
+    val requestHwid: String? = null,
+    val requestOs: String? = null,
+    val requestOsVersion: String? = null,
+    val requestDeviceModel: String? = null,
+    val requestLocale: String? = null,
+) {
+    /** The columns as the value the fetcher reads; unknown stored modes fall back to inherit. */
+    val requestSettings: SubscriptionRequestSettings
+        get() = SubscriptionRequestSettings(
+            spoofMode = requestSpoofMode?.let { stored ->
+                SpoofMode.entries.firstOrNull { it.name == stored }
+            },
+            sendHwid = requestSendHwid,
+            appVersion = requestAppVersion,
+            userAgent = requestUserAgent,
+            userId = requestUserId,
+            hwid = requestHwid,
+            os = requestOs,
+            osVersion = requestOsVersion,
+            deviceModel = requestDeviceModel,
+            locale = requestLocale,
+        )
+}

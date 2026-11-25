@@ -143,6 +143,7 @@ class DatabaseRegressionTest {
             sql.execSQL("ALTER TABLE subscriptions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
             sql.execSQL("ALTER TABLE subscriptions ADD COLUMN logoPath TEXT")
             ChumpyDatabase.MIGRATION_12_13.migrate(sql)
+            ChumpyDatabase.MIGRATION_13_14.migrate(sql)
             sql.setTransactionSuccessful()
         } finally {
             sql.endTransaction()

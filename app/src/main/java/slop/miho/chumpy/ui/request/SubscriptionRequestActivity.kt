@@ -1,0 +1,150 @@
+package slop.miho.chumpy.ui.request
+
+import android.os.Bundle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import slop.miho.chumpy.Graph
+import slop.miho.chumpy.sub.HappSpoof
+import slop.miho.chumpy.sub.HappSpoof.happFingerprint
+import slop.miho.chumpy.data.UiSettings
+import slop.miho.chumpy.data.SettingsStore
+import slop.miho.chumpy.db.SubscriptionRequestSettings
+import slop.miho.chumpy.data.SpoofMode
+import slop.miho.chumpy.ui.components.*
+import slop.miho.chumpy.R
+import androidx.compose.ui.res.stringResource
+import slop.miho.chumpy.ui.theme.ChumpyTheme
+
+/** Per-row request identity: inherited fields stay global, explicit values belong to this row. */
+class SubscriptionRequestActivity : ControllerActivity() {
+    companion object { const val EXTRA_ID = "subscription_id" }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        val id = intent.getStringExtra(EXTRA_ID)
+        setContent {
+            val ui by SettingsStore.settings(this).collectAsStateWithLifecycle()
+            ChumpyTheme(settings = ui) {
+                Surface(color = MaterialTheme.colorScheme.surface) {
+                    RequestSettingsScreen(
+                        initial = null,
+                        global = ui,
+                        onBack = ::finish,
+                        load = { id?.let { Graph.subscriptions.subscriptionById(it)?.requestSettings } ?: SubscriptionRequestSettings() },
+                        save = { settings -> if (id != null) Graph.subscriptions.setSubscriptionRequestSettings(id, settings) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RequestSettingsScreen(
+    initial: SubscriptionRequestSettings?,
+    global: UiSettings,
+    onBack: () -> Unit,
+    load: suspend () -> SubscriptionRequestSettings,
+    save: suspend (SubscriptionRequestSettings) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var loaded by remember { mutableStateOf(initial) }
+    var failure by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        try { loaded = load() }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { android.util.Log.e("Chumpy/Request", "Could not load request settings", e); failure = true }
+    }
+    val saveMutex = remember { Mutex() }
+    val value = loaded
+    if (value == null) {
+        PreferenceEditor(R.string.subscription_request_title, onBack) {
+            if (failure) Text(stringResource(R.string.request_save_error), color = MaterialTheme.colorScheme.error)
+            else androidx.compose.material3.CircularProgressIndicator()
+        }
+        return
+    }
+    fun commit(next: SubscriptionRequestSettings) {
+        loaded = next
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) {
+                saveMutex.withLock {
+                    try { save(next); failure = false }
+                    catch (e: Exception) {
+                        android.util.Log.e("Chumpy/Request", "Could not save request settings", e)
+                        failure = true
+                    }
+                }
+            }
+        }
+    }
+    val effectiveMode = value.spoofMode ?: global.spoofMode
+    val base = global.copy(spoofMode = if (global.spoofMode == SpoofMode.OFF) SpoofMode.HAPP else global.spoofMode)
+        .happFingerprint()!!
+    val effective = HappSpoof.override(global.happFingerprint(), value.copy(
+        spoofMode = if (effectiveMode == SpoofMode.OFF) SpoofMode.HAPP else effectiveMode,
+    ), base)!!
+    val userAgent = HappSpoof.headers(effective).getValue("User-Agent")
+    PreferenceEditor(R.string.subscription_request_title, onBack) {
+        if (failure) Text(stringResource(R.string.request_save_error), color = MaterialTheme.colorScheme.error)
+        PreferenceSection {
+        Text(stringResource(R.string.request_client), style = MaterialTheme.typography.titleMedium)
+        ChoiceRow(
+            labels = listOf(stringResource(R.string.request_inherit), "Happ", "INCY", stringResource(R.string.request_off)),
+            selected = when (value.spoofMode) { null -> 0; SpoofMode.HAPP -> 1; SpoofMode.INCY -> 2; SpoofMode.OFF -> 3 },
+            onSelect = { index -> commit(value.copy(spoofMode = when (index) { 0 -> null; 1 -> SpoofMode.HAPP; 2 -> SpoofMode.INCY; else -> SpoofMode.OFF })) },
+        )
+        }
+        PreferenceSection {
+        Text("HWID", style = MaterialTheme.typography.titleMedium)
+        ChoiceRow(
+            labels = listOf(stringResource(R.string.request_inherit), stringResource(R.string.request_send), stringResource(R.string.request_omit)),
+            selected = when (value.sendHwid) { null -> 0; true -> 1; false -> 2 },
+            onSelect = { index -> commit(value.copy(sendHwid = when (index) { 0 -> null; 1 -> true; else -> false })) },
+        )
+        }
+        RequestField("User-Agent", value.userAgent ?: userAgent) { commit(value.copy(userAgent = it)) }
+        RequestField(stringResource(R.string.happ_app_version), value.appVersion ?: effective.appVersion) { commit(value.copy(appVersion = it)) }
+        RequestField(stringResource(R.string.happ_user_id), value.userId ?: effective.userId) { commit(value.copy(userId = it)) }
+        RequestField(stringResource(R.string.happ_hwid), value.hwid ?: effective.hwid) { commit(value.copy(hwid = it)) }
+        RequestField(stringResource(R.string.happ_os), value.os ?: effective.os) { commit(value.copy(os = it)) }
+        RequestField(stringResource(R.string.happ_os_version), value.osVersion ?: effective.osVersion) { commit(value.copy(osVersion = it)) }
+        RequestField(stringResource(R.string.happ_device_model), value.deviceModel ?: effective.deviceModel) { commit(value.copy(deviceModel = it)) }
+        RequestField(stringResource(R.string.happ_locale), value.locale ?: effective.locale) { commit(value.copy(locale = it)) }
+    }
+}
+
+@Composable
+private fun ChoiceRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    PreferenceChoices(labels, selected, onSelect)
+}
+
+@Composable
+private fun RequestField(label: String, value: String?, onChange: (String?) -> Unit) {
+    var text by remember(value) { mutableStateOf(value.orEmpty()) }
+    PreferenceField(
+        value = text,
+        onValueChange = { text = it; onChange(it.takeIf(String::isNotBlank)) },
+        label = label,
+        singleLine = true,
+    )
+}

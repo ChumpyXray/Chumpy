@@ -1,4 +1,29 @@
 <resources>
+    <string name="custom_routing_title">Своя маршрутизация</string>
+    <string name="custom_routing_off">Правила блокировки, обхода и прокси</string>
+    <string name="custom_routing_count">Свои правила: %1$d</string>
+    <string name="custom_routing_exclusive_hint">Своя маршрутизация включена; региональные пресеты отключены.</string>
+    <string name="custom_routing_chain_hint">При включении эта цепочка заменяет региональные пресеты и правила подписки.</string>
+    <string name="custom_routing_enabled">Включить свои правила</string>
+    <string name="custom_routing_only_chain">Используется только эта цепочка</string>
+    <string name="custom_routing_order">Порядок правил</string>
+    <string name="custom_routing_last_stage_fallback">Трафик без совпадений всегда идёт через VPN.</string>
+    <string name="custom_routing_sources_hint">Выберите готовый источник или укажите HTTPS-ссылку. Источники используются для правил geosite: и geoip:.</string>
+    <string name="custom_routing_trim_hint">Полные файлы хранятся для подсказок категорий; перед запуском остаются только выбранные категории.</string>
+    <string name="custom_routing_geosite_url">Ссылка на geosite.dat</string>
+    <string name="custom_routing_geoip_url">Ссылка на geoip.dat</string>
+    <string name="custom_routing_use_imported_geosite">Использовать импортированный geosite.dat</string>
+    <string name="custom_routing_use_imported_geoip">Использовать импортированный geoip.dat</string>
+    <string name="custom_routing_import_geosite">Импортировать geosite.dat</string>
+    <string name="custom_routing_replace_geosite">Заменить geosite.dat</string>
+    <string name="custom_routing_import_geoip">Импортировать geoip.dat</string>
+    <string name="custom_routing_replace_geoip">Заменить geoip.dat</string>
+    <string name="custom_routing_file_hint">Нужны бинарные protobuf-файлы Xray geosite.dat / geoip.dat.</string>
+    <string name="custom_routing_loaded_count">Загружено категорий: %1$d</string>
+    <string name="custom_routing_imported_count">Импортировано категорий: %1$d</string>
+    <string name="custom_routing_target_blocked">Блокировать</string>
+    <string name="custom_routing_target_direct">Напрямую</string>
+    <string name="custom_routing_target_proxy">Через прокси</string>
     <!-- Стадия сборки — тихая плашка рядом с именем. -->
     <string name="badge_alpha">Альфа</string>
 
@@ -100,7 +125,7 @@
     <string name="happ_hwid">HWID</string>
     <string name="happ_regenerate">Пересоздать личность</string>
     <string name="happ_regenerate_title">Пересоздать личность?</string>
-    <string name="happ_regenerate_text">Новый ID пользователя и HWID займут место старых — панели увидят устройство, которое встречают впервые, а текущая личность исчезнет навсегда.</string>
+    <string name="happ_regenerate_text">Новый ID пользователя и HWID займут место старых - панели увидят устройство, которое встречают впервые, а текущая личность исчезнет навсегда.</string>
     <string name="happ_regenerate_confirm">Пересоздать</string>
 
     <!-- Первый запуск -->
@@ -158,8 +183,8 @@
     <string name="settings_navbar_blur_intensity">Насколько плотной и размытой становится панель</string>
     <string name="settings_classic_navbar">Классическая панель навигации</string>
     <string name="settings_classic_navbar_hint">Полная полоса внизу вместо плавающих пилюль</string>
-    <string name="settings_small_screen_forced_on">Компактная раскладка включена принудительно. Долгое нажатие — переключить</string>
-    <string name="settings_small_screen_forced_off">Компактная раскладка выключена принудительно. Долгое нажатие — переключить</string>
+    <string name="settings_small_screen_forced_on">Компактная раскладка включена принудительно. Долгое нажатие - переключить</string>
+    <string name="settings_small_screen_forced_off">Компактная раскладка выключена принудительно. Долгое нажатие - переключить</string>
 
     <!-- Настройки подключения -->
     <string name="settings_routing_global">Глобальный</string>
@@ -252,7 +277,7 @@
     <string name="stats_loss_warning">Слишком большие потери пакетов: %1$d%%</string>
     <string name="stats_probes_caption">Замер каждые 15 с</string>
     <string name="stats_core_logs">Логи ядра</string>
-    <string name="stats_core_logs_empty">Пока ничего — подключи туннель</string>
+    <string name="stats_core_logs_empty">Пока ничего - подключи туннель</string>
     <string name="stats_core_logs_copy">Скопировать логи</string>
     <string name="stats_waiting">Ждём данных…</string>
     <string name="stats_no_data">Нет данных</string>
@@ -276,7 +301,7 @@
     <string name="notif_reconnected_title">Соединение восстановлено</string>
     <string name="notif_reconnected_text">Chumpy сама вернула туннель.</string>
     <string name="notif_reconnect_failed_title">Не удалось переподключиться</string>
-    <string name="notif_interrupted_off">Туннель отключён — Chumpy не станет поднимать его сама.</string>
+    <string name="notif_interrupted_off">Туннель отключён - Chumpy не станет поднимать его сама.</string>
     <string name="notif_action_reconnect">Переподключить</string>
     <string name="notif_action_disconnect_anyway">Всё равно отключить</string>
     <string name="notif_channel_updates">Обновления приложения</string>
@@ -320,8 +345,8 @@
     <string name="phone_wallpaper_qr">Сканируй телефоном, чтобы отправить обои</string>
     <string name="phone_wallpaper_instructions">Подключи телефон к той же локальной сети. Сканируй QR-код или открой адрес в браузере и введи код. Выбери изображение и отправь его.</string>
     <string name="wallpapers_move_hint_controller">Удерживайте OK, чтобы переместить обои</string>
-    <string name="wallpapers_move_controls">Стрелки — перемещение · Меню — масштаб · OK — сохранить · Назад — отменить</string>
-    <string name="wallpapers_zoom_controls">Стрелки — масштаб · Меню — перемещение · OK — сохранить · Назад — отменить</string>
+    <string name="wallpapers_move_controls">Стрелки - перемещение · Меню - масштаб · OK - сохранить · Назад - отменить</string>
+    <string name="wallpapers_zoom_controls">Стрелки - масштаб · Меню - перемещение · OK - сохранить · Назад - отменить</string>
     <string name="error_geodata_source_missing">В базе %1$s нет категорий %2$s, а подписка не указала адрес их загрузки. Обновите подписку или запросите базу у провайдера.</string>
     <string name="error_geodata_categories">База провайдера не содержит нужных категорий: %1$s.</string>
     <string name="error_geodata_download">Не удалось подготовить базу маршрутизации подписки: %1$s</string>
@@ -356,6 +381,37 @@
     <string name="tunnel_error_timeout">Слишком долго ждали ответа. Попробуйте снова или выберите другой сервер.</string>
     <string name="tunnel_error_stopping">VPN ещё отключается. Подождите немного и попробуйте снова.</string>
     <string name="tunnel_error_storage">На устройстве закончилось место. Освободите немного памяти и попробуйте снова.</string>
+    <string name="request_inherit_hint">Пустые поля используют настройки приложения. Изменения применятся при следующем обновлении подписки.</string>
+    <string name="request_client">Клиент</string>
+    <string name="request_inherit">Как в настройках</string>
+    <string name="request_off">Выключено</string>
+    <string name="request_send">Отправлять</string>
+    <string name="request_omit">Не отправлять</string>
+    <string name="custom_routing_save">Сохранить правила</string>
+    <string name="custom_routing_https_required">Нужны HTTPS-ссылки без логина и пароля в адресе.</string>
+    <string name="custom_routing_load_categories">Загрузить категории %1$s</string>
+    <string name="request_save_error">Не удалось прочитать или сохранить настройки. См. логи.</string>
+    <string name="custom_routing_move_up">Поднять: %1$s</string>
+    <string name="custom_routing_move_down">Опустить: %1$s</string>
+    <string name="custom_routing_import_required">Сначала импортируйте выбранный файл GeoSite или GeoIP.</string>
+    <string name="custom_routing_operation_error">Не удалось загрузить базу. Проверьте файл или ссылку. Подробности - в логах.</string>
+    <string name="happ_send_hwid">Отправлять HWID</string>
+    <string name="happ_send_hwid_on">Передавать идентификатор устройства при подмене клиента</string>
+    <string name="happ_send_hwid_off">Не передавать идентификатор устройства</string>
+    <string name="subscription_request_title">Запрос подписки</string>
+    <string name="per_app_only_empty">Выберите хотя бы одно установленное приложение для VPN</string>
+    <string name="subscription_request_settings">Настройки запроса и HWID</string>
+    <string name="per_app_bypass_mode">Выбранные - без VPN</string>
+    <string name="per_app_only_mode">VPN только выбранным</string>
+    <plurals name="per_app_only_count">
+        <item quantity="one">VPN только для %1$d приложения</item>
+        <item quantity="few">VPN только для %1$d приложений</item>
+        <item quantity="many">VPN только для %1$d приложений</item>
+        <item quantity="other">VPN только для %1$d приложения</item>
+    </plurals>
+    <string name="custom_routing_loading_categories">Загрузка %1$s…</string>
+    <string name="custom_routing_loading_percent">Загрузка %1$s: %2$d%%</string>
+    <string name="subscription_request_pick">Выберите подписку</string>
     <string name="random_local_port">Случайный локальный порт</string>
     <string name="local_proxy_port">Локальный SOCKS-порт (1024-65535)</string>
     <string name="local_port_reconnect">Применяется при следующем подключении VPN. Отключите случайный выбор, чтобы использовать указанный порт.</string>

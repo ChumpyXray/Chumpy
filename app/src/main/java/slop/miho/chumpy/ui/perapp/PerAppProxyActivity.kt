@@ -123,11 +123,15 @@ class PerAppProxyActivity : ControllerActivity() {
                     PerAppProxyScreen(
                         frost = ui.navigationBarBlur,
                         appsEnabled = connection.perAppEnabled,
+                        onlyMode = connection.perAppOnly,
                         bypassedApps = connection.bypassedApps,
                         onToggleAppsEnabled = { enabled ->
                             ConnectionStore.update(this) { settings ->
                                 settings.copy(perAppEnabled = enabled)
                             }
+                        },
+                        onOnlyModeChange = { only ->
+                            ConnectionStore.update(this) { settings -> settings.copy(perAppOnly = only) }
                         },
                         onToggleApp = { pkg ->
                             ConnectionStore.update(this) { settings ->
@@ -162,8 +166,10 @@ private data class AppEntry(
 private fun PerAppProxyScreen(
     frost: Boolean,
     appsEnabled: Boolean,
+    onlyMode: Boolean,
     bypassedApps: Set<String>,
     onToggleAppsEnabled: (Boolean) -> Unit,
+    onOnlyModeChange: (Boolean) -> Unit,
     onToggleApp: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -188,8 +194,10 @@ private fun PerAppProxyScreen(
             ) {
                 AppsPage(
                     enabled = appsEnabled,
+                    onlyMode = onlyMode,
                     bypassed = bypassedApps,
                     onToggleEnabled = onToggleAppsEnabled,
+                    onOnlyModeChange = onOnlyModeChange,
                     onToggle = onToggleApp,
                 )
             }
@@ -247,8 +255,10 @@ private fun PerAppProxyScreen(
 @Composable
 private fun AppsPage(
     enabled: Boolean,
+    onlyMode: Boolean,
     bypassed: Set<String>,
     onToggleEnabled: (Boolean) -> Unit,
+    onOnlyModeChange: (Boolean) -> Unit,
     onToggle: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -301,20 +311,24 @@ private fun AppsPage(
             listState = listState,
             pullShift = pullShift,
             toggle = {
-                MasterSwitchRow(
-                    title = stringResource(R.string.per_app_title),
-                    supporting = when {
-                        !enabled -> stringResource(R.string.per_app_disabled)
-                        bypassed.isEmpty() -> stringResource(R.string.per_app_hint)
-                        else -> pluralStringResource(
-                            R.plurals.per_app_count,
-                            bypassed.size,
-                            bypassed.size,
-                        )
-                    },
-                    enabled = enabled,
-                    onChange = onToggleEnabled,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MasterSwitchRow(
+                        title = stringResource(R.string.per_app_title),
+                        supporting = when {
+                            !enabled -> stringResource(R.string.per_app_disabled)
+                            onlyMode -> pluralStringResource(R.plurals.per_app_only_count, bypassed.size, bypassed.size)
+                            bypassed.isEmpty() -> stringResource(R.string.per_app_hint)
+                            else -> pluralStringResource(R.plurals.per_app_count, bypassed.size, bypassed.size)
+                        },
+                        enabled = enabled,
+                        onChange = onToggleEnabled,
+                    )
+                    slop.miho.chumpy.ui.components.PreferenceChoices(
+                        labels = listOf(stringResource(R.string.per_app_bypass_mode), stringResource(R.string.per_app_only_mode)),
+                        selected = if (onlyMode) 1 else 0,
+                        onSelect = { onOnlyModeChange(it == 1) },
+                    )
+                }
             },
         ) {
             item(key = "app search") {

@@ -827,6 +827,7 @@ private fun ScreenLinkRow(
     supporting: String,
     icon: Int,
     target: Class<*>,
+    extra: Pair<String, String>? = null,
 ) {
     val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -848,7 +849,9 @@ private fun ScreenLinkRow(
             ) {
                 poke()
                 taps++
-                context.startActivity(Intent(context, target))
+                val intent = Intent(context, target)
+                extra?.let { (key, value) -> intent.putExtra(key, value) }
+                context.startActivity(intent)
             }
             .padding(horizontal = 16.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -976,6 +979,7 @@ private fun BackgroundRefreshRow(
     supporting: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    title: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -1004,7 +1008,7 @@ private fun BackgroundRefreshRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.settings_background_refresh),
+                text = title ?: stringResource(R.string.settings_background_refresh),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -1073,12 +1077,29 @@ fun ConnectionScreen(
         // the tunnel at all.
         SettingsGroup(
             {
-                RoutingRow(
-                    selected = connection.routingMode,
-                    flagStyle = flagStyle,
-                    onSelect = { mode ->
-                        onChangeConnection { it.copy(routingMode = mode) }
-                    },
+                if (connection.customRouting.enabled) {
+                    Text(
+                        text = stringResource(R.string.custom_routing_exclusive_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+                    )
+                } else {
+                    RoutingRow(
+                        selected = connection.routingMode,
+                        flagStyle = flagStyle,
+                        onSelect = { mode -> onChangeConnection { it.copy(routingMode = mode) } },
+                    )
+                }
+            },
+            {
+                ScreenLinkRow(
+                    title = stringResource(R.string.custom_routing_title),
+                    supporting = if (connection.customRouting.enabled) {
+                        stringResource(R.string.custom_routing_count, connection.customRouting.entryCount)
+                    } else stringResource(R.string.custom_routing_off),
+                    icon = R.drawable.ic_tune,
+                    target = slop.miho.chumpy.ui.routing.CustomRoutingActivity::class.java,
                 )
             },
             {
@@ -1086,6 +1107,11 @@ fun ConnectionScreen(
                     title = stringResource(R.string.per_app_title),
                     supporting = when {
                         !connection.perAppEnabled -> stringResource(R.string.per_app_disabled)
+                        connection.perAppOnly -> pluralStringResource(
+                            R.plurals.per_app_only_count,
+                            connection.bypassedApps.size,
+                            connection.bypassedApps.size,
+                        )
                         connection.bypassedApps.isEmpty() -> stringResource(R.string.per_app_hint)
                         else -> pluralStringResource(
                             R.plurals.per_app_count,
@@ -1165,7 +1191,7 @@ fun ConnectionScreen(
         // The spoof's own block, between the carrying and the measuring. The header
         // carries two rows of its own, separated by the fold rows' own 2dp seam: the
         // picker ("Spoofer", with the picked client named beneath it — Happ's big
-        // italic H, INCY's own lowercase word, the crossed-out circle for going out
+        // official client marks, the crossed-out circle for going out
         // bare) and the strings' doorway beneath it — "Edit spoof strings" with the
         // background refresh's own triangle — so a working spoof sits compact, two
         // rows tall, and the fingerprint's seven fields ride folded behind the
@@ -1199,20 +1225,10 @@ fun ConnectionScreen(
                         title = stringResource(R.string.spoof_title),
                         showSelectedLabel = true,
                         options = listOf(
-                            IconChoice(R.string.spoof_as_happ, SpoofMode.HAPP) {
-                                // The Happ app's own mark: the bold upright H — the layout
-                                // box centers it on its own, whatever the typeface.
-                                Text(
-                                    text = "H",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            },
+                            IconChoice(R.drawable.ic_happ, R.string.spoof_as_happ, SpoofMode.HAPP),
                             IconChoice(R.string.spoof_as_incy, SpoofMode.INCY) {
-                                Text(
-                                    text = "INCY",
-                                    style = MaterialTheme.typography.titleSmall,
-                                )
+                                Icon(painterResource(R.drawable.ic_incy), contentDescription = null,
+                                    modifier = Modifier.size(width = 36.dp, height = 24.dp))
                             },
                             IconChoice(R.drawable.ic_block, R.string.per_app_disabled, SpoofMode.OFF),
                         ),
@@ -1228,6 +1244,17 @@ fun ConnectionScreen(
                 },
             ),
             rows = listOf(
+                {
+                    ToggleRow(
+                        title = stringResource(R.string.happ_send_hwid),
+                        supporting = stringResource(
+                            if (settings.happSendHwid) R.string.happ_send_hwid_on else R.string.happ_send_hwid_off,
+                        ),
+                        icon = R.drawable.ic_device,
+                        checked = settings.happSendHwid,
+                        onChange = { enabled -> onChangeSettings { it.copy(happSendHwid = enabled) } },
+                    )
+                },
                 {
                     HappRegenerateRow(
                         onRegenerate = { happRegenPending = true },
@@ -1339,8 +1366,36 @@ fun ConnectionScreen(
                     }
                 },
             )
+            SubscriptionRequestPicker(subscriptions)
         }
     }
+}
+
+@Composable
+private fun SubscriptionRequestPicker(subscriptions: List<slop.miho.chumpy.db.SubscriptionEntity>) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    FoldingGroup(
+        expanded = expanded,
+        headerRows = listOf({
+            BackgroundRefreshRow(
+                title = stringResource(R.string.subscription_request_settings),
+                supporting = stringResource(R.string.subscription_request_pick),
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+            )
+        }),
+        rows = subscriptions.map { subscription ->
+            @Composable {
+                ScreenLinkRow(
+                    title = subscription.name.ifBlank { stringResource(R.string.subscription_none) },
+                    supporting = stringResource(R.string.subscription_request_settings),
+                    icon = R.drawable.ic_database,
+                    target = slop.miho.chumpy.ui.request.SubscriptionRequestActivity::class.java,
+                    extra = slop.miho.chumpy.ui.request.SubscriptionRequestActivity.EXTRA_ID to subscription.id,
+                )
+            }
+        },
+    )
 }
 
 /**

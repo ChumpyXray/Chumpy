@@ -98,9 +98,13 @@
     <string name="happ_locale">Language</string>
     <string name="happ_user_id">User ID</string>
     <string name="happ_hwid">HWID</string>
+    <string name="happ_send_hwid">Send HWID</string>
+    <string name="happ_send_hwid_on">Include the hardware ID in spoofed requests</string>
+    <string name="happ_send_hwid_off">Do not send an HWID header</string>
+    <string name="subscription_request_title">Subscription request</string>
     <string name="happ_regenerate">Regenerate identity</string>
     <string name="happ_regenerate_title">Regenerate the identity?</string>
-    <string name="happ_regenerate_text">A new user ID and hardware ID take the old one\'s place — the panels will see a fresh device they have never met, and the current identity is gone for good.</string>
+    <string name="happ_regenerate_text">A new user ID and hardware ID take the old one\'s place - the panels will see a fresh device they have never met, and the current identity is gone for good.</string>
     <string name="happ_regenerate_confirm">Regenerate</string>
 
     <!-- Welcome (first run) -->
@@ -167,6 +171,33 @@
     <string name="settings_routing_global">Global</string>
     <string name="settings_routing_global_hint">Route everything</string>
     <string name="settings_routing_dont_route">Don\'t route %s</string>
+    <string name="custom_routing_title">Custom routing</string>
+    <string name="custom_routing_off">Blocked, direct and proxy rules</string>
+    <string name="custom_routing_exclusive_hint">Custom routing is active; regional presets are disabled.</string>
+    <string name="custom_routing_chain_hint">When enabled, this chain replaces regional presets and panel routing.</string>
+    <string name="custom_routing_enabled">Enable custom rules</string>
+    <string name="custom_routing_only_chain">Only this rule chain is used</string>
+    <string name="custom_routing_order">Rule order</string>
+    <string name="custom_routing_last_stage_fallback">Unmatched traffic always uses the VPN.</string>
+    <string name="custom_routing_sources_hint">Choose a ready-made source or enter your own HTTPS URL. Sources are used for geosite: and geoip: rules.</string>
+    <string name="custom_routing_trim_hint">Full files are cached for category suggestions; only selected categories are prepared for the running tunnel.</string>
+    <string name="custom_routing_geosite_url">geosite.dat URL</string>
+    <string name="custom_routing_geoip_url">geoip.dat URL</string>
+    <string name="custom_routing_use_imported_geosite">Use imported geosite.dat</string>
+    <string name="custom_routing_use_imported_geoip">Use imported geoip.dat</string>
+    <string name="custom_routing_import_geosite">Import geosite.dat</string>
+    <string name="custom_routing_replace_geosite">Replace geosite.dat</string>
+    <string name="custom_routing_import_geoip">Import geoip.dat</string>
+    <string name="custom_routing_replace_geoip">Replace geoip.dat</string>
+    <string name="custom_routing_file_hint">Files must be Xray geosite.dat / geoip.dat protobuf databases.</string>
+    <string name="custom_routing_loaded_count">Loaded %1$d categories</string>
+    <string name="custom_routing_imported_count">Imported %1$d categories</string>
+    <string name="custom_routing_target_blocked">Blocked</string>
+    <string name="custom_routing_target_direct">Direct</string>
+    <string name="custom_routing_target_proxy">Proxy</string>
+    <string name="custom_routing_count">%1$d custom entries</string>
+    <string name="per_app_only_empty">Pick at least one app to proxy</string>
+    <string name="subscription_request_settings">Request and HWID settings</string>
     <string name="region_ru">Russia</string>
     <string name="region_cn">China</string>
     <string name="region_ir">Iran</string>
@@ -183,6 +214,12 @@
         <item quantity="other">Don\'t route %1$d apps</item>
     </plurals>
     <string name="per_app_disabled">Disabled</string>
+    <string name="per_app_bypass_mode">Bypass selected</string>
+    <string name="per_app_only_mode">Proxy selected only</string>
+    <plurals name="per_app_only_count">
+        <item quantity="one">Proxy only %1$d app</item>
+        <item quantity="other">Proxy only %1$d apps</item>
+    </plurals>
 
     <string name="connection_auto_reconnect">Auto-reconnect</string>
     <string name="connection_auto_reconnect_on">The tunnel comes back on its own wherever it fell</string>
@@ -256,7 +293,7 @@
     <string name="stats_loss_warning">Packet loss too high: %1$d%%</string>
     <string name="stats_probes_caption">A probe every 15 s</string>
     <string name="stats_core_logs">Core logs</string>
-    <string name="stats_core_logs_empty">Nothing yet — connect the tunnel</string>
+    <string name="stats_core_logs_empty">Nothing yet - connect the tunnel</string>
     <string name="stats_core_logs_copy">Copy the logs</string>
     <string name="stats_waiting">Waiting for data…</string>
     <string name="stats_no_data">No data</string>
@@ -281,7 +318,7 @@
     <string name="notif_reconnected_title">Connection restored</string>
     <string name="notif_reconnected_text">Chumpy brought the tunnel back by itself.</string>
     <string name="notif_reconnect_failed_title">Reconnect failed</string>
-    <string name="notif_interrupted_off">The tunnel is down — Chumpy will not bring it back on its own.</string>
+    <string name="notif_interrupted_off">The tunnel is down - Chumpy will not bring it back on its own.</string>
     <string name="notif_action_reconnect">Reconnect</string>
     <string name="notif_action_disconnect_anyway">Disconnect anyway</string>
     <string name="notif_channel_updates">App updates</string>
@@ -361,6 +398,23 @@
     <string name="tunnel_error_timeout">The connection took too long. Try again or choose another server.</string>
     <string name="tunnel_error_stopping">The VPN is still stopping. Wait a moment and try again.</string>
     <string name="tunnel_error_storage">The device is out of storage. Free some space and try again.</string>
+    <string name="request_inherit_hint">Empty fields use the app settings. Changes apply on the next subscription update.</string>
+    <string name="request_client">Client</string>
+    <string name="request_inherit">App default</string>
+    <string name="request_off">Off</string>
+    <string name="request_send">Send</string>
+    <string name="request_omit">Omit</string>
+    <string name="custom_routing_save">Save rules</string>
+    <string name="custom_routing_https_required">Use HTTPS links without a username or password.</string>
+    <string name="custom_routing_load_categories">Load %1$s categories</string>
+    <string name="request_save_error">Could not read or save settings. See logs.</string>
+    <string name="custom_routing_move_up">Move %1$s up</string>
+    <string name="custom_routing_move_down">Move %1$s down</string>
+    <string name="custom_routing_import_required">Import the selected GeoSite or GeoIP file first.</string>
+    <string name="custom_routing_operation_error">Could not load the database. Check the file or link. See logs for details.</string>
+    <string name="custom_routing_loading_categories">Loading %1$s…</string>
+    <string name="custom_routing_loading_percent">Loading %1$s: %2$d%%</string>
+    <string name="subscription_request_pick">Choose a subscription</string>
     <string name="random_local_port">Random local port</string>
     <string name="local_proxy_port">Local SOCKS port (1024-65535)</string>
     <string name="local_port_reconnect">Applies on the next VPN connection. Turn off random selection to use the specified port.</string>

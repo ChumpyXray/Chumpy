@@ -23,6 +23,7 @@ import slop.miho.chumpy.db.ChumpyDatabase
 import slop.miho.chumpy.db.ProfileEntity
 import slop.miho.chumpy.db.ProfileType
 import slop.miho.chumpy.db.SubscriptionEntity
+import slop.miho.chumpy.db.SubscriptionRequestSettings
 import slop.miho.chumpy.db.balancerMemberKeys
 import slop.miho.chumpy.db.computeLinkKey
 import java.util.UUID
@@ -55,7 +56,12 @@ class SubscriptionRepository(
 
     private val refreshLocks = ConcurrentHashMap<String, Mutex>()
 
-    private val fetcher = SubscriptionFetcher(tunnelUp, happSpoof)
+    private val fetcher = SubscriptionFetcher(tunnelUp, happSpoof) {
+        with(HappSpoof) {
+            slop.miho.chumpy.data.SettingsStore.settings(this@SubscriptionRepository.context).value
+                .copy(spoofMode = slop.miho.chumpy.data.SpoofMode.HAPP).happFingerprint()
+        }
+    }
     private val subscriptions = db.subscriptionDao()
     private val profiles = db.profileDao()
 
@@ -77,7 +83,7 @@ class SubscriptionRepository(
     suspend fun addSubscription(url: String, name: String? = null): Result<SubscriptionEntity> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val (body, metadata) = fetchWithNestedExpansion(url)
+                val (body, metadata) = fetchWithNestedExpansion(url, SubscriptionRequestSettings())
                 val headerSources = GeodataSources.parseSafely(metadata.geodataSources)
                 val parsed = SubscriptionParser.parse(body).map {
                     it.copy(geodataSources = GeodataSources.merge(headerSources, it.geodataSources))
@@ -121,7 +127,7 @@ class SubscriptionRepository(
                     val entity = subscriptions.byId(id) ?: error("Subscription not found")
                     val attemptAt = System.currentTimeMillis()
                     try {
-                        val (body, metadata) = fetchWithNestedExpansion(entity.url)
+                        val (body, metadata) = fetchWithNestedExpansion(entity.url, entity.requestSettings)
                         val headerSources = GeodataSources.parseSafely(metadata.geodataSources)
                         val parsed = SubscriptionParser.parse(body).map {
                             it.copy(geodataSources = GeodataSources.merge(headerSources, it.geodataSources))
@@ -166,8 +172,28 @@ class SubscriptionRepository(
             }
         }
 
-    suspend fun prepareGeodata(profile: ProfileEntity, config: String, importedRouting: Boolean): String =
-        slop.miho.chumpy.data.GeodataFiles.prepare(context, config, profile.geodataSources, importedRouting, fetcher::fetchGeodata)
+    suspend fun prepareGeodata(
+        profile: ProfileEntity,
+        config: String,
+        importedRouting: Boolean,
+        geodataOverrides: Map<String, String> = emptyMap(),
+        geodataSourceOverrides: Map<String, String> = emptyMap(),
+    ): String =
+        slop.miho.chumpy.data.GeodataFiles.prepare(
+            context,
+            config,
+            profile.geodataSources,
+            importedRouting,
+            fetcher::fetchGeodata,
+            geodataOverrides,
+            geodataSourceOverrides,
+            fetcher::fetchGeodataCatalog,
+        )
+
+    suspend fun fetchCustomGeodata(url: String, target: java.io.File) = fetcher.fetchGeodata(url, target)
+
+    suspend fun fetchCustomGeodataCatalog(url: String, target: java.io.File, onProgress: (Int?) -> Unit = {}) =
+        fetcher.fetchGeodataCatalogWithProgress(url, target, onProgress)
 
     suspend fun deleteSubscription(id: String) = withContext(Dispatchers.IO) {
         subscriptions.delete(id)
@@ -272,6 +298,24 @@ class SubscriptionRepository(
     suspend fun setSubscriptionPinned(id: String, pinned: Boolean) =
         withContext(Dispatchers.IO) { subscriptions.setPinned(id, pinned) }
 
+    /** Saves the row's request identity without touching metadata or profile rows. */
+    suspend fun setSubscriptionRequestSettings(id: String, settings: SubscriptionRequestSettings) =
+        withContext(Dispatchers.IO) {
+            subscriptions.setRequestSettings(
+                id = id,
+                spoofMode = settings.spoofMode?.name,
+                sendHwid = settings.sendHwid,
+                appVersion = settings.appVersion,
+                userAgent = settings.userAgent,
+                userId = settings.userId,
+                hwid = settings.hwid,
+                os = settings.os,
+                osVersion = settings.osVersion,
+                deviceModel = settings.deviceModel,
+                locale = settings.locale,
+            )
+        }
+
     /**
      * Stamps the drafts as rows: identity, ownership, order and — where the linkKey
      * matches an old row of the same subscription — the old id, ping and its timestamp.
@@ -311,13 +355,16 @@ class SubscriptionRepository(
      * subscription. One level of expansion, Hiddify-style, covers the panels that do it.
      * The second fetch dresses up the same way the first did — the fingerprint is global.
      */
-    private suspend fun fetchWithNestedExpansion(url: String): Pair<String, SubscriptionMetadata> {
-        val first = fetcher.fetch(url)
+    private suspend fun fetchWithNestedExpansion(
+        url: String,
+        requestSettings: SubscriptionRequestSettings,
+    ): Pair<String, SubscriptionMetadata> {
+        val first = fetcher.fetch(url, requestSettings)
         val nested = SubscriptionParser.isNestedSubscriptionUrl(first.body)
             ?.takeIf { it != url }
             ?: return first.body to first.metadata
         Log.d(TAG, "Subscription is nested; following one level")
-        val second = fetcher.fetch(nested)
+        val second = fetcher.fetch(nested, requestSettings)
         // The nested response is the real one: its sources override the outer's per key.
         return second.body to second.metadata.copy(
             geodataSources = GeodataSources.merge(first.metadata.geodataSources, second.metadata.geodataSources),

@@ -18,6 +18,7 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 
 import slop.miho.chumpy.core.LocalProxy
+import slop.miho.chumpy.db.SubscriptionRequestSettings
 
 /**
  * Fetches a subscription body with cancellation and an overall deadline. When the tunnel is up the
@@ -31,6 +32,7 @@ import slop.miho.chumpy.core.LocalProxy
 class SubscriptionFetcher(
     private val tunnelUp: () -> Boolean,
     private val happSpoof: () -> HappSpoof.Fingerprint?,
+    private val fallbackFingerprint: () -> HappSpoof.Fingerprint? = happSpoof,
 ) {
     private companion object {
         /**
@@ -82,10 +84,10 @@ class SubscriptionFetcher(
      * when the settings carry one, takes the UA and the x- headers over from the app's
      * own identity.
      */
-    suspend fun fetch(rawUrl: String): FetchResult {
-        val response = fetchResponse(rawUrl)
+    suspend fun fetch(rawUrl: String, requestSettings: SubscriptionRequestSettings = SubscriptionRequestSettings()): FetchResult {
+        val response = fetchResponse(rawUrl, requestSettings)
         val source = response.metadata.routingProfileUrl ?: return response
-        val profile = fetchResponse(source)
+        val profile = fetchResponse(source, requestSettings)
         val sources = GeodataSources.fromRoutingBody(profile.body)
         if (sources.isEmpty()) throw IOException("Routing profile provides no geodata download URLs")
         return response.copy(metadata = response.metadata.copy(
@@ -93,12 +95,13 @@ class SubscriptionFetcher(
         ))
     }
 
-    private suspend fun fetchResponse(rawUrl: String): FetchResult = suspendCancellableCoroutine { continuation ->
+    private suspend fun fetchResponse(rawUrl: String, requestSettings: SubscriptionRequestSettings): FetchResult = suspendCancellableCoroutine { continuation ->
         val client = if (tunnelUp()) tunnelClient() else directClient
         val request = Request.Builder().url(normalizeUrl(rawUrl)).get()
-        val fingerprint = happSpoof()
+        val fingerprint = HappSpoof.override(happSpoof(), requestSettings, fallbackFingerprint())
         if (fingerprint != null) HappSpoof.headers(fingerprint).forEach { (name, value) -> request.header(name, value) }
-        else request.header("User-Agent", USER_AGENT).header("Accept", "*/*")
+        else request.header("User-Agent", requestSettings.userAgent?.takeIf { it.isNotBlank() } ?: USER_AGENT)
+            .header("Accept", "*/*")
         val call = client.newCall(request.build())
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
@@ -126,7 +129,21 @@ class SubscriptionFetcher(
         })
     }
 
-    suspend fun fetchGeodata(url: String, target: java.io.File): Unit = suspendCancellableCoroutine { continuation ->
+    suspend fun fetchGeodata(url: String, target: java.io.File) =
+        fetchGeodataLimited(url, target, slop.miho.chumpy.data.GeodataFiles.MAX_BYTES)
+
+    suspend fun fetchGeodataCatalog(url: String, target: java.io.File) =
+        fetchGeodataLimited(url, target, slop.miho.chumpy.data.GeodataFiles.MAX_SOURCE_BYTES)
+
+    suspend fun fetchGeodataCatalogWithProgress(url: String, target: java.io.File, onProgress: (Int?) -> Unit) =
+        fetchGeodataLimited(url, target, slop.miho.chumpy.data.GeodataFiles.MAX_SOURCE_BYTES, onProgress)
+
+    private suspend fun fetchGeodataLimited(
+        url: String,
+        target: java.io.File,
+        maxBytes: Long,
+        onProgress: (Int?) -> Unit = {},
+    ): Unit = suspendCancellableCoroutine { continuation ->
         val parsed = url.toHttpUrlOrNull()
         if (parsed == null || !parsed.isHttps || parsed.username.isNotEmpty() || parsed.password.isNotEmpty()) {
             continuation.resumeWithException(IOException("Geodata requires an HTTPS URL without embedded credentials"))
@@ -134,7 +151,7 @@ class SubscriptionFetcher(
         }
         val base = if (tunnelUp()) tunnelClient() else directClient
         val client = base.newBuilder().followSslRedirects(false).callTimeout(45, java.util.concurrent.TimeUnit.SECONDS).build()
-        val call = client.newCall(Request.Builder().url(parsed).header("User-Agent", USER_AGENT).build())
+        val call = client.newCall(Request.Builder().url(parsed).header("User-Agent", USER_AGENT).header("Accept-Encoding", "identity").build())
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) { if (continuation.isActive) continuation.resumeWithException(e) }
@@ -142,7 +159,25 @@ class SubscriptionFetcher(
                 try {
                     response.use {
                         if (!it.isSuccessful || !it.request.url.isHttps) throw IOException("Geodata HTTP ${it.code}")
-                        val input = it.body?.byteStream()?.buffered() ?: throw IOException("Empty geodata")
+                        val body = it.body ?: throw IOException("Empty geodata")
+                        val expected = body.contentLength()
+                        var received = 0L
+                        var lastPercent: Int? = null
+                        onProgress(if (expected > 0) 0 else null)
+                        val counted = object : java.io.FilterInputStream(body.byteStream()) {
+                            private fun report(count: Int) {
+                                if (count <= 0) return
+                                received += count
+                                if (expected > 0) {
+                                    val percent = ((received.toDouble() / expected) * 100).toInt().coerceIn(0, 99)
+                                    if (percent != lastPercent) { lastPercent = percent; onProgress(percent) }
+                                }
+                            }
+                            override fun read(): Int = `in`.read().also { if (it >= 0) report(1) }
+                            override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+                                `in`.read(buffer, offset, length).also(::report)
+                        }
+                        val input = counted.buffered()
                         input.mark(2)
                         val gzip = input.read() == 0x1f && input.read() == 0x8b
                         input.reset()
@@ -155,10 +190,11 @@ class SubscriptionFetcher(
                                 val count = source.read(buffer)
                                 if (count < 0) break
                                 total += count
-                                if (total > slop.miho.chumpy.data.GeodataFiles.MAX_BYTES) throw IOException("Geodata exceeds 64 MiB")
+                                if (total > maxBytes) throw IOException("Geodata exceeds ${maxBytes / (1024 * 1024)} MiB")
                                 output.write(buffer, 0, count)
                             }
                             if (total == 0L) throw IOException("Empty geodata")
+                            onProgress(100)
                         } }
                     }
                     if (continuation.isActive) continuation.resume(Unit)

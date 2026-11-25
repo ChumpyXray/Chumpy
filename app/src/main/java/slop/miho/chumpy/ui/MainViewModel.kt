@@ -457,7 +457,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    val tunnelStatus: StateFlow<TunnelStatus> = tunnelClient.status
+    private val preparingConnection = MutableStateFlow(false)
+    private val preparationError = MutableStateFlow<String?>(null)
+    private val preparationLog = MutableStateFlow<String?>(null)
+    val tunnelStatus: StateFlow<TunnelStatus> = combine(tunnelClient.status, preparingConnection, preparationError) { status, preparing, error ->
+        if (preparing) TunnelStatus(TunnelState.CONNECTING)
+        else status.copy(error = error ?: status.error)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, tunnelClient.status.value)
 
     private var connectJob: Job? = null
     private val connectGeneration = java.util.concurrent.atomic.AtomicInteger()
@@ -481,8 +487,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             connection.drop(1).collect { current ->
                 val bypassChanged = previous.bypassedApps != current.bypassedApps ||
-                    previous.perAppEnabled != current.perAppEnabled || previous.bypassLan != current.bypassLan
-                if (bypassChanged && tunnelStatus.value.state in setOf(TunnelState.UP, TunnelState.CONNECTING)) {
+                    previous.perAppEnabled != current.perAppEnabled ||
+                    previous.perAppOnly != current.perAppOnly ||
+                    previous.bypassLan != current.bypassLan
+                // The custom lists are part of the config itself — a write from their own
+                // screen reloads the running tunnel in place, like the mode's tile does.
+                val customChanged = previous.customRouting != current.customRouting &&
+                    (previous.customRouting.enabled || current.customRouting.enabled)
+                if ((bypassChanged || customChanged) &&
+                    tunnelStatus.value.state in setOf(TunnelState.UP, TunnelState.CONNECTING)) {
                     applyConfigAndConnect()
                 }
                 previous = current
@@ -501,7 +514,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     val coreLogs: StateFlow<String?> = flow {
         while (true) {
-            emit(tunnelClient.coreLogs())
+            emit(listOfNotNull(tunnelClient.coreLogs(), preparationLog.value).joinToString("\n").ifEmpty { null })
             delay(1000)
         }
     }.flowOn(Dispatchers.IO).distinctUntilChanged()
@@ -709,15 +722,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val lastSeen = prefs.getLong("version_code", 0L)
             if (lastSeen >= versionCode) return@launch
             val pending = repository.subscriptions().first()
-            if (lastSeen == 0L && pending.isEmpty()) {
-                prefs.edit { putLong("version_code", versionCode) }
-                return@launch
+            refreshSubscriptionsForUpgrade(prefs, versionCode, pending.map { it.id }) { id ->
+                repository.updateSubscription(id).isSuccess
             }
-            var succeeded = true
-            pending.forEach { subscription ->
-                if (repository.updateSubscription(subscription.id).isFailure) succeeded = false
-            }
-            if (succeeded) prefs.edit { putLong("version_code", versionCode) }
         }
     }
 
@@ -782,6 +789,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnect() {
         val generation = connectGeneration.incrementAndGet()
         connectJob?.cancel()
+        preparingConnection.value = false
+        preparationError.value = null
         viewModelScope.launch(Dispatchers.IO) {
             configurationMutex.withLock {
                 if (generation == connectGeneration.get()) tunnelClient.disconnect()
@@ -793,10 +802,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         profile: ProfileEntity? = _servers.value.profiles.firstOrNull { it.id == connection.value.selectedProfileId }
             ?: _servers.value.profiles.firstOrNull(),
     ) {
-        profile ?: return
+        if (profile == null) {
+            preparationError.value = app.getString(R.string.error_no_config)
+            return
+        }
         val requestedConnection = connection.value
         val generation = connectGeneration.incrementAndGet()
         connectJob?.cancel()
+        preparationError.value = null
+        preparingConnection.value = true
         connectJob = viewModelScope.launch(Dispatchers.IO) {
             configurationMutex.withLock {
                 try {
@@ -820,12 +834,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         emptyList()
                     }
-                    val config = repository.prepareGeodata(resolvedProfile, XrayConfigBuilder.buildFull(
+                    val config = repository.prepareGeodata(
                         resolvedProfile,
-                        requestedConnection.routingMode,
-                        members,
-                        requestedConnection.delayTestUrl,
-                    ), requestedConnection.routingMode == RoutingMode.GLOBAL && resolvedProfile.routingRules.isNotBlank())
+                        XrayConfigBuilder.buildFull(
+                            resolvedProfile,
+                            requestedConnection.routingMode,
+                            members,
+                            requestedConnection.delayTestUrl,
+                            requestedConnection.customRouting,
+                        ),
+                        requestedConnection.routingMode == RoutingMode.GLOBAL && resolvedProfile.routingRules.isNotBlank(),
+                        requestedConnection.customRouting.geodataOverrides,
+                        requestedConnection.customRouting.geodataSources,
+                    )
                     val subscriptionName = resolvedProfile.subscriptionId?.let { repository.subscriptionById(it)?.name }
                     currentCoroutineContext().ensureActive()
                     val requestContext = currentCoroutineContext()
@@ -841,7 +862,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (generation == connectGeneration.get()) _servers.update { it.copy(error = e.message ?: app.getString(R.string.error_unknown)) }
+                    if (generation == connectGeneration.get()) {
+                        val message = e.message ?: app.getString(R.string.error_unknown)
+                        preparationError.value = message
+                        preparationLog.value = "E/Connection preparation: ${e.javaClass.simpleName}: ${message.take(2000)}"
+                        Log.e("Chumpy/Connect", "Connection preparation failed", e)
+                        _servers.update { it.copy(error = message) }
+                    }
+                } finally {
+                    if (generation == connectGeneration.get()) preparingConnection.value = false
                 }
             }
         }
@@ -1565,6 +1594,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fun trimLossBuckets(buckets: List<LossBucket>): List<LossBucket> {
             val cutoff = System.currentTimeMillis() - STATS_WINDOW_MILLIS
             return buckets.dropWhile { it.atMillis < cutoff }
+        }
+    }
+}
+
+internal suspend fun refreshSubscriptionsForUpgrade(
+    prefs: android.content.SharedPreferences,
+    versionCode: Long,
+    subscriptionIds: List<String>,
+    refresh: suspend (String) -> Boolean,
+) {
+    if (prefs.getLong("version_code", 0L) >= versionCode) return
+    val completed = if (prefs.getLong("pending_version_code", 0L) == versionCode) {
+        prefs.getStringSet("completed_subscriptions", emptySet()).orEmpty().intersect(subscriptionIds.toSet()).toMutableSet()
+    } else mutableSetOf()
+    for (id in subscriptionIds) {
+        currentCoroutineContext().ensureActive()
+        if (id in completed || !refresh(id)) continue
+        completed.add(id)
+        if (!prefs.edit().putLong("pending_version_code", versionCode)
+                .putStringSet("completed_subscriptions", completed.toSet()).commit()) {
+            Log.w("Chumpy/Upgrade", "Could not save subscription refresh progress")
+            return
+        }
+    }
+    currentCoroutineContext().ensureActive()
+    if (completed.containsAll(subscriptionIds)) {
+        if (!prefs.edit().putLong("version_code", versionCode)
+                .remove("pending_version_code").remove("completed_subscriptions").commit()) {
+            Log.w("Chumpy/Upgrade", "Could not save completed parser upgrade")
         }
     }
 }

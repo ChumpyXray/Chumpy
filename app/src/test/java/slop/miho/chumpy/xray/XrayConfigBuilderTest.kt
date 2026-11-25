@@ -9,6 +9,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import slop.miho.chumpy.db.ProfileEntity
 import slop.miho.chumpy.db.ProfileType
+import slop.miho.chumpy.data.CustomRouting
+import slop.miho.chumpy.data.CustomRouteStage
 
 /**
  * The routing rules, asserted on their actual rendered shape: every rule must carry a
@@ -103,6 +105,65 @@ class XrayConfigBuilderTest {
         val quic = rules.first { it["outboundTag"]?.jsonPrimitive?.content == "block" }
         assertEquals("443", quic["port"]?.jsonPrimitive?.content)
         assertEquals("udp", quic["network"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `custom routing compiles domains and addresses with explicit precedence`() {
+        val rules = rulesOf(
+            XrayConfigBuilder.buildFull(
+                profile,
+                RoutingMode.BYPASS_RU,
+                customRouting = CustomRouting(
+                    enabled = true,
+                    blocked = listOf("ads.example", "geoip:category-ads"),
+                    direct = listOf("example.org", "203.0.113.0/24", "geosite:category-ru"),
+                    proxy = listOf("example.ru", "geoip:ru"),
+                ),
+            ),
+        )
+        assertEquals("block", rules.first()["outboundTag"]?.jsonPrimitive?.content)
+        assertEquals("domain:ads.example", rules.first()["domain"]!!.jsonArray.single().jsonPrimitive.content)
+        assertEquals("geoip:category-ads", rules[1]["ip"]!!.jsonArray.single().jsonPrimitive.content)
+        val customDirect = rules.first { it["domain"]?.jsonArray?.any { it.jsonPrimitive.content == "geosite:category-ru" } == true }
+        assertEquals("direct", customDirect["outboundTag"]!!.jsonPrimitive.content)
+        val customProxy = rules.first { it["domain"]?.jsonArray?.any { it.jsonPrimitive.content == "domain:example.ru" } == true }
+        assertEquals("proxy", customProxy["outboundTag"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `disabled custom routing contributes no rules`() {
+        val config = XrayConfigBuilder.buildFull(
+            profile,
+            RoutingMode.GLOBAL,
+            customRouting = CustomRouting(blocked = listOf("example.com")),
+        )
+        assertEquals(3, rulesOf(config).size)
+    }
+
+    @Test
+    fun `enabled custom policy is exclusive and unmatched traffic uses the proxy`() {
+        val rules = rulesOf(
+            XrayConfigBuilder.buildFull(
+                profile,
+                RoutingMode.BYPASS_RU,
+                customRouting = CustomRouting(
+                    enabled = true,
+                    blocked = listOf("blocked.example"),
+                    direct = listOf("direct.example"),
+                    proxy = listOf("proxy.example"),
+                    stageOrder = listOf(CustomRouteStage.BLOCKED, CustomRouteStage.PROXY, CustomRouteStage.DIRECT),
+                ),
+            ),
+        )
+        assertEquals("domain:blocked.example", rules[0]["domain"]!!.jsonArray.single().jsonPrimitive.content)
+        assertEquals("block", rules[0]["outboundTag"]!!.jsonPrimitive.content)
+        assertEquals("domain:proxy.example", rules[1]["domain"]!!.jsonArray.single().jsonPrimitive.content)
+        assertEquals("proxy", rules[1]["outboundTag"]!!.jsonPrimitive.content)
+        assertEquals("domain:direct.example", rules[2]["domain"]!!.jsonArray.single().jsonPrimitive.content)
+        assertEquals("direct", rules[2]["outboundTag"]!!.jsonPrimitive.content)
+        assertEquals("proxy", rules.last()["outboundTag"]!!.jsonPrimitive.content)
+        assertTrue(rules.none { it["domain"]?.jsonArray?.any { it.jsonPrimitive.content == "geosite:private" } == true })
+        assertTrue(rules.none { it["ip"]?.jsonArray?.any { it.jsonPrimitive.content == "geoip:ru" } == true })
     }
 
     @Test
