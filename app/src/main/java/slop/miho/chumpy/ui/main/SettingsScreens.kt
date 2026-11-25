@@ -1327,17 +1327,41 @@ fun ConnectionScreen(
                     }
                 },
             )
-            SettingsGroup(*subscriptions.map { subscription ->
-                @Composable {
-                    ScreenLinkRow(
-                        title = subscription.name.ifBlank { stringResource(R.string.subscription_none) },
-                        supporting = stringResource(R.string.subscription_request_settings),
-                        icon = R.drawable.ic_database,
-                        target = slop.miho.chumpy.ui.request.SubscriptionRequestActivity::class.java,
-                        extra = slop.miho.chumpy.ui.request.SubscriptionRequestActivity.EXTRA_ID to subscription.id,
-                    )
-                }
-            }.toTypedArray())
+            SettingsGroup({ SubscriptionRequestPicker(subscriptions) })
+        }
+    }
+}
+
+@Composable
+private fun SubscriptionRequestPicker(subscriptions: List<slop.miho.chumpy.db.SubscriptionEntity>) {
+    val context = LocalContext.current
+    var expanded by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxWidth()) {
+        OutgoingRow(
+            title = stringResource(R.string.subscription_request_settings),
+            supporting = stringResource(R.string.subscription_request_pick),
+            icon = R.drawable.ic_database,
+            onClick = { expanded = true },
+        )
+        androidx.compose.material3.DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.heightIn(max = 360.dp),
+        ) {
+            subscriptions.forEach { subscription ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = {
+                        Text(subscription.name.ifBlank { stringResource(R.string.subscription_none) },
+                            maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    },
+                    onClick = {
+                        expanded = false
+                        context.startActivity(Intent(context,
+                            slop.miho.chumpy.ui.request.SubscriptionRequestActivity::class.java)
+                            .putExtra(slop.miho.chumpy.ui.request.SubscriptionRequestActivity.EXTRA_ID, subscription.id))
+                    },
+                )
+            }
         }
     }
 }
