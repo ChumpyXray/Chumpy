@@ -95,6 +95,7 @@ class CustomRoutingActivity : ControllerActivity() {
 private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val currentValue by androidx.compose.runtime.rememberUpdatedState(value)
     var importing by remember { mutableStateOf(false) }
     var automaticCatalogRequests by remember { mutableStateOf(emptySet<CategorySource>()) }
     var importGeoip by remember { mutableStateOf(false) }
@@ -147,8 +148,8 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
                         val names = temporary.inputStream().use {
                             GeodataFiles.categories(it, GeodataFiles.MAX_SOURCE_BYTES).toList().sorted()
                         }
-                        target.delete()
-                        if (!temporary.renameTo(target)) error("Could not cache geodata catalog")
+                        java.nio.file.Files.move(temporary.toPath(), target.toPath(),
+                            java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                         names
                     } finally {
                         temporary.delete()
@@ -157,6 +158,7 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
             }
             importing = false
             result.onSuccess { names ->
+                if (url != (if (source == CategorySource.GEOSITE) currentValue.geositeUrl else currentValue.geoipUrl)) return@onSuccess
                 if (source == CategorySource.GEOSITE) geositeCategories = names else geoipCategories = names
                 notice = context.getString(slop.miho.chumpy.R.string.custom_routing_loaded_count, names.size)
             }.onFailure { notice = it.message ?: "Could not load categories" }
@@ -171,7 +173,8 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
                     val directory = File(context.filesDir, "xray_assets").apply { mkdirs() }
                     val name = if (importGeoip) GeodataFiles.USER_GEOIP_FILE else GeodataFiles.USER_GEOSITE_FILE
                     val target = File(directory, name)
-                    val temporary = File(directory, "$name.part")
+                    val temporary = File.createTempFile("import-", ".part", directory)
+                    try {
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         temporary.outputStream().use { output ->
                         val buffer = ByteArray(64 * 1024)
@@ -187,14 +190,15 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
                     } ?: error("Could not read file")
                     require(temporary.length() > 0) { "Empty geodata file" }
                     val categories = temporary.inputStream().use { GeodataFiles.categories(it, GeodataFiles.MAX_SOURCE_BYTES) }
-                    if (target.exists()) target.delete()
-                    if (!temporary.renameTo(target)) { temporary.delete(); error("Could not store geodata") }
+                    java.nio.file.Files.move(temporary.toPath(), target.toPath(),
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                     name to categories.toList().sorted()
+                    } finally { temporary.delete() }
                 }
             }
             importing = false
             result.onSuccess { (filename, importedCategories) ->
-                onChange(if (filename == GeodataFiles.USER_GEOIP_FILE) value.copy(customGeoip = true) else value.copy(customGeosite = true))
+                onChange(if (filename == GeodataFiles.USER_GEOIP_FILE) currentValue.copy(customGeoip = true) else currentValue.copy(customGeosite = true))
                 if (filename == GeodataFiles.USER_GEOIP_FILE) geoipCategories = importedCategories else geositeCategories = importedCategories
                 notice = context.getString(slop.miho.chumpy.R.string.custom_routing_imported_count, importedCategories.size)
             }.onFailure { notice = it.message ?: "Could not import geodata" }

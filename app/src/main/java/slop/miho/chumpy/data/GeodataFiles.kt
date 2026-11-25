@@ -98,10 +98,8 @@ internal object GeodataFiles {
                     try {
                         fetchCatalog(customUrl, temporary)
                         temporary.inputStream().use { GeodataFiles.categories(it, MAX_SOURCE_BYTES) }
-                        if (!temporary.renameTo(catalog)) {
-                            catalog.delete()
-                            if (!temporary.renameTo(catalog)) throw IOException("Could not cache geodata catalog")
-                        }
+                        java.nio.file.Files.move(temporary.toPath(), catalog.toPath(),
+                            java.nio.file.StandardCopyOption.ATOMIC_MOVE, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                     } finally {
                         temporary.delete()
                     }
