@@ -40,7 +40,9 @@ import slop.miho.chumpy.Graph
 import slop.miho.chumpy.data.SettingsStore
 import slop.miho.chumpy.db.SubscriptionRequestSettings
 import slop.miho.chumpy.data.SpoofMode
-import slop.miho.chumpy.ui.components.ControllerActivity
+import slop.miho.chumpy.ui.components.*
+import slop.miho.chumpy.R
+import androidx.compose.ui.res.stringResource
 import slop.miho.chumpy.ui.theme.ChumpyTheme
 
 /** Per-row request identity: inherited fields stay global, explicit values belong to this row. */
@@ -56,8 +58,8 @@ class SubscriptionRequestActivity : ControllerActivity() {
             ChumpyTheme(settings = ui) {
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     RequestSettingsScreen(
-                        title = getString(slop.miho.chumpy.R.string.subscription_request_title),
                         initial = null,
+                        onBack = ::finish,
                         load = { id?.let { Graph.subscriptions.subscriptionById(it)?.requestSettings } ?: SubscriptionRequestSettings() },
                         save = { settings -> if (id != null) Graph.subscriptions.setSubscriptionRequestSettings(id, settings) },
                     )
@@ -69,8 +71,8 @@ class SubscriptionRequestActivity : ControllerActivity() {
 
 @Composable
 private fun RequestSettingsScreen(
-    title: String,
     initial: SubscriptionRequestSettings?,
+    onBack: () -> Unit,
     load: suspend () -> SubscriptionRequestSettings,
     save: suspend (SubscriptionRequestSettings) -> Unit,
 ) {
@@ -85,53 +87,47 @@ private fun RequestSettingsScreen(
             withContext(NonCancellable) { saveMutex.withLock { save(next) } }
         }
     }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
-            .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.headlineSmall)
-        Text("Blank values inherit the app-wide spoof settings. Changes apply to the next fetch.", style = MaterialTheme.typography.bodyMedium)
-        Text("Client", style = MaterialTheme.typography.titleMedium)
+    PreferenceEditor(R.string.subscription_request_title, onBack) {
+        Text(stringResource(R.string.request_inherit_hint), style = MaterialTheme.typography.bodyMedium)
+        PreferenceSection {
+        Text(stringResource(R.string.request_client), style = MaterialTheme.typography.titleMedium)
         ChoiceRow(
-            labels = listOf("Inherit", "Happ", "INCY", "Off"),
+            labels = listOf(stringResource(R.string.request_inherit), "Happ", "INCY", stringResource(R.string.request_off)),
             selected = when (value.spoofMode) { null -> 0; SpoofMode.HAPP -> 1; SpoofMode.INCY -> 2; SpoofMode.OFF -> 3 },
             onSelect = { index -> commit(value.copy(spoofMode = when (index) { 0 -> null; 1 -> SpoofMode.HAPP; 2 -> SpoofMode.INCY; else -> SpoofMode.OFF })) },
         )
+        }
+        PreferenceSection {
         Text("HWID", style = MaterialTheme.typography.titleMedium)
         ChoiceRow(
-            labels = listOf("Inherit", "Send", "Omit"),
+            labels = listOf(stringResource(R.string.request_inherit), stringResource(R.string.request_send), stringResource(R.string.request_omit)),
             selected = when (value.sendHwid) { null -> 0; true -> 1; false -> 2 },
             onSelect = { index -> commit(value.copy(sendHwid = when (index) { 0 -> null; 1 -> true; else -> false })) },
         )
+        }
         RequestField("User-Agent", value.userAgent) { commit(value.copy(userAgent = it)) }
-        RequestField("App version", value.appVersion) { commit(value.copy(appVersion = it)) }
-        RequestField("User ID", value.userId) { commit(value.copy(userId = it)) }
-        RequestField("HWID value", value.hwid) { commit(value.copy(hwid = it)) }
-        RequestField("OS", value.os) { commit(value.copy(os = it)) }
-        RequestField("OS version", value.osVersion) { commit(value.copy(osVersion = it)) }
-        RequestField("Device model", value.deviceModel) { commit(value.copy(deviceModel = it)) }
-        RequestField("Locale", value.locale) { commit(value.copy(locale = it)) }
+        RequestField(stringResource(R.string.happ_app_version), value.appVersion) { commit(value.copy(appVersion = it)) }
+        RequestField(stringResource(R.string.happ_user_id), value.userId) { commit(value.copy(userId = it)) }
+        RequestField(stringResource(R.string.happ_hwid), value.hwid) { commit(value.copy(hwid = it)) }
+        RequestField(stringResource(R.string.happ_os), value.os) { commit(value.copy(os = it)) }
+        RequestField(stringResource(R.string.happ_os_version), value.osVersion) { commit(value.copy(osVersion = it)) }
+        RequestField(stringResource(R.string.happ_device_model), value.deviceModel) { commit(value.copy(deviceModel = it)) }
+        RequestField(stringResource(R.string.happ_locale), value.locale) { commit(value.copy(locale = it)) }
     }
 }
 
 @Composable
 private fun ChoiceRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        labels.forEachIndexed { index, label ->
-            FilterChip(selected = index == selected, onClick = { onSelect(index) }, label = { Text(label) })
-        }
-    }
+    PreferenceChoices(labels, selected, onSelect)
 }
 
 @Composable
 private fun RequestField(label: String, value: String?, onChange: (String?) -> Unit) {
     var text by remember(value) { mutableStateOf(value.orEmpty()) }
-    OutlinedTextField(
+    PreferenceField(
         value = text,
         onValueChange = { text = it; onChange(it.takeIf(String::isNotBlank)) },
-        label = { Text(label) },
+        label = label,
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )

@@ -7,7 +7,7 @@
     <string name="custom_routing_enabled">Включить свои правила</string>
     <string name="custom_routing_only_chain">Используется только эта цепочка</string>
     <string name="custom_routing_order">Порядок правил</string>
-    <string name="custom_routing_last_stage_fallback">Если совпадений нет, используется последняя стадия.</string>
+    <string name="custom_routing_last_stage_fallback">Трафик без совпадений всегда идёт через VPN.</string>
     <string name="custom_routing_sources_hint">Выберите готовый источник или укажите HTTPS-ссылку. Источники используются для правил geosite: и geoip:.</string>
     <string name="custom_routing_trim_hint">Полные файлы хранятся для подсказок категорий; перед запуском остаются только выбранные категории.</string>
     <string name="custom_routing_geosite_url">Ссылка на geosite.dat</string>
@@ -379,4 +379,10 @@
     <string name="tunnel_error_timeout">Слишком долго ждали ответа. Попробуйте снова или выберите другой сервер.</string>
     <string name="tunnel_error_stopping">VPN ещё отключается. Подождите немного и попробуйте снова.</string>
     <string name="tunnel_error_storage">На устройстве закончилось место. Освободите немного памяти и попробуйте снова.</string>
+    <string name="request_inherit_hint">Пустые поля используют настройки приложения. Изменения применятся при следующем обновлении подписки.</string>
+    <string name="request_client">Клиент</string>
+    <string name="request_inherit">Как в настройках</string>
+    <string name="request_off">Выключено</string>
+    <string name="request_send">Отправлять</string>
+    <string name="request_omit">Не отправлять</string>
 </resources>

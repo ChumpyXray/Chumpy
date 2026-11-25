@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -46,7 +47,8 @@ import slop.miho.chumpy.data.CustomRouting
 import slop.miho.chumpy.data.CustomRouteStage
 import slop.miho.chumpy.data.GeodataFiles
 import slop.miho.chumpy.Graph
-import slop.miho.chumpy.ui.components.ControllerActivity
+import slop.miho.chumpy.ui.components.*
+import slop.miho.chumpy.R
 import slop.miho.chumpy.ui.theme.ChumpyTheme
 import java.io.File
 
@@ -83,6 +85,7 @@ class CustomRoutingActivity : ControllerActivity() {
                 Surface(color = MaterialTheme.colorScheme.surface) {
                     CustomRoutingScreen(
                         value = connection.customRouting,
+                        onBack = ::finish,
                         onChange = { value -> ConnectionStore.update(this) { it.copy(customRouting = value) } },
                     )
                 }
@@ -92,7 +95,7 @@ class CustomRoutingActivity : ControllerActivity() {
 }
 
 @Composable
-private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) -> Unit) {
+private fun CustomRoutingScreen(value: CustomRouting, onBack: () -> Unit, onChange: (CustomRouting) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val currentValue by androidx.compose.runtime.rememberUpdatedState(value)
@@ -204,13 +207,9 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
             }.onFailure { notice = it.message ?: "Could not import geodata" }
         }
     }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
-            .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_title), style = MaterialTheme.typography.headlineSmall)
+    PreferenceEditor(R.string.custom_routing_title, onBack) {
+        Text(stringResource(R.string.custom_routing_chain_hint), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(slop.miho.chumpy.R.string.custom_routing_enabled), style = MaterialTheme.typography.bodyLarge)
@@ -218,6 +217,8 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
             Switch(value.enabled, onCheckedChange = { onChange(value.copy(enabled = it)) })
         }
         Text(stringResource(slop.miho.chumpy.R.string.custom_routing_order), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.custom_routing_last_stage_fallback), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         value.stageOrder.forEachIndexed { index, stage ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stageLabel(stage), modifier = Modifier.weight(1f))
@@ -260,17 +261,17 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
                 )
             }
         }
-        OutlinedTextField(
+        PreferenceField(
             value = value.geositeUrl,
             onValueChange = { onChange(value.copy(geositeUrl = it, customGeosite = false)) },
-            label = { Text(stringResource(slop.miho.chumpy.R.string.custom_routing_geosite_url)) },
+            label = stringResource(R.string.custom_routing_geosite_url),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        PreferenceField(
             value = value.geoipUrl,
             onValueChange = { onChange(value.copy(geoipUrl = it, customGeoip = false)) },
-            label = { Text(stringResource(slop.miho.chumpy.R.string.custom_routing_geoip_url)) },
+            label = stringResource(R.string.custom_routing_geoip_url),
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -282,11 +283,11 @@ private fun CustomRoutingScreen(value: CustomRouting, onChange: (CustomRouting) 
             Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geoip), modifier = Modifier.weight(1f))
             Switch(value.customGeoip, onCheckedChange = { onChange(value.copy(customGeoip = it)) })
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = !importing, onClick = { importGeoip = false; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !importing, onClick = { importGeoip = false; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
                 Text(stringResource(if (value.customGeosite) slop.miho.chumpy.R.string.custom_routing_replace_geosite else slop.miho.chumpy.R.string.custom_routing_import_geosite))
             }
-            Button(enabled = !importing, onClick = { importGeoip = true; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
+            FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !importing, onClick = { importGeoip = true; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
                 Text(stringResource(if (value.customGeoip) slop.miho.chumpy.R.string.custom_routing_replace_geoip else slop.miho.chumpy.R.string.custom_routing_import_geoip))
             }
         }
@@ -357,7 +358,7 @@ private fun EntryField(
         text = next
         onChange(next.lineSequence().map(String::trim).filter(String::isNotEmpty).distinct().toList())
     }
-    OutlinedTextField(
+    PreferenceField(
         value = text,
         onValueChange = { next ->
             update(next)
@@ -368,7 +369,8 @@ private fun EntryField(
                 else -> null
             })
         },
-        label = { Text(title) },
+        label = title,
+        singleLine = false,
         minLines = 3,
         modifier = Modifier.fillMaxWidth(),
     )

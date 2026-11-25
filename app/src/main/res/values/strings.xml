@@ -176,7 +176,7 @@
     <string name="custom_routing_enabled">Enable custom rules</string>
     <string name="custom_routing_only_chain">Only this rule chain is used</string>
     <string name="custom_routing_order">Rule order</string>
-    <string name="custom_routing_last_stage_fallback">Unmatched traffic uses the last stage as its fallback.</string>
+    <string name="custom_routing_last_stage_fallback">Unmatched traffic always uses the VPN.</string>
     <string name="custom_routing_sources_hint">Choose a ready-made source or enter your own HTTPS URL. Sources are used for geosite: and geoip: rules.</string>
     <string name="custom_routing_trim_hint">Full files are cached for category suggestions; only selected categories are prepared for the running tunnel.</string>
     <string name="custom_routing_geosite_url">geosite.dat URL</string>
@@ -396,4 +396,10 @@
     <string name="tunnel_error_timeout">The connection took too long. Try again or choose another server.</string>
     <string name="tunnel_error_stopping">The VPN is still stopping. Wait a moment and try again.</string>
     <string name="tunnel_error_storage">The device is out of storage. Free some space and try again.</string>
+    <string name="request_inherit_hint">Empty fields use the app settings. Changes apply on the next subscription update.</string>
+    <string name="request_client">Client</string>
+    <string name="request_inherit">App default</string>
+    <string name="request_off">Off</string>
+    <string name="request_send">Send</string>
+    <string name="request_omit">Omit</string>
 </resources>
