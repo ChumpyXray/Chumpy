@@ -965,6 +965,7 @@ private fun BackgroundRefreshRow(
     supporting: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    title: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -993,7 +994,7 @@ private fun BackgroundRefreshRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.settings_background_refresh),
+                text = title ?: stringResource(R.string.settings_background_refresh),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -1327,43 +1328,36 @@ fun ConnectionScreen(
                     }
                 },
             )
-            SettingsGroup({ SubscriptionRequestPicker(subscriptions) })
+            SubscriptionRequestPicker(subscriptions)
         }
     }
 }
 
 @Composable
 private fun SubscriptionRequestPicker(subscriptions: List<slop.miho.chumpy.db.SubscriptionEntity>) {
-    val context = LocalContext.current
-    var expanded by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth()) {
-        OutgoingRow(
-            title = stringResource(R.string.subscription_request_settings),
-            supporting = stringResource(R.string.subscription_request_pick),
-            icon = R.drawable.ic_database,
-            onClick = { expanded = true },
-        )
-        androidx.compose.material3.DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.heightIn(max = 360.dp),
-        ) {
-            subscriptions.forEach { subscription ->
-                androidx.compose.material3.DropdownMenuItem(
-                    text = {
-                        Text(subscription.name.ifBlank { stringResource(R.string.subscription_none) },
-                            maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    },
-                    onClick = {
-                        expanded = false
-                        context.startActivity(Intent(context,
-                            slop.miho.chumpy.ui.request.SubscriptionRequestActivity::class.java)
-                            .putExtra(slop.miho.chumpy.ui.request.SubscriptionRequestActivity.EXTRA_ID, subscription.id))
-                    },
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    FoldingGroup(
+        expanded = expanded,
+        headerRows = listOf({
+            BackgroundRefreshRow(
+                title = stringResource(R.string.subscription_request_settings),
+                supporting = stringResource(R.string.subscription_request_pick),
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+            )
+        }),
+        rows = subscriptions.map { subscription ->
+            @Composable {
+                ScreenLinkRow(
+                    title = subscription.name.ifBlank { stringResource(R.string.subscription_none) },
+                    supporting = stringResource(R.string.subscription_request_settings),
+                    icon = R.drawable.ic_database,
+                    target = slop.miho.chumpy.ui.request.SubscriptionRequestActivity::class.java,
+                    extra = slop.miho.chumpy.ui.request.SubscriptionRequestActivity.EXTRA_ID to subscription.id,
                 )
             }
-        }
-    }
+        },
+    )
 }
 
 /**
