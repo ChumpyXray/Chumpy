@@ -78,16 +78,37 @@ private fun RequestSettingsScreen(
 ) {
     val scope = rememberCoroutineScope()
     var loaded by remember { mutableStateOf(initial) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { loaded = load() }
+    var failure by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        try { loaded = load() }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: Exception) { android.util.Log.e("Chumpy/Request", "Could not load request settings", e); failure = true }
+    }
     val saveMutex = remember { Mutex() }
-    val value = loaded ?: return
+    val value = loaded
+    if (value == null) {
+        PreferenceEditor(R.string.subscription_request_title, onBack) {
+            if (failure) Text(stringResource(R.string.request_save_error), color = MaterialTheme.colorScheme.error)
+            else androidx.compose.material3.CircularProgressIndicator()
+        }
+        return
+    }
     fun commit(next: SubscriptionRequestSettings) {
         loaded = next
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            withContext(NonCancellable) { saveMutex.withLock { save(next) } }
+            withContext(NonCancellable) {
+                saveMutex.withLock {
+                    try { save(next); failure = false }
+                    catch (e: Exception) {
+                        android.util.Log.e("Chumpy/Request", "Could not save request settings", e)
+                        failure = true
+                    }
+                }
+            }
         }
     }
     PreferenceEditor(R.string.subscription_request_title, onBack) {
+        if (failure) Text(stringResource(R.string.request_save_error), color = MaterialTheme.colorScheme.error)
         Text(stringResource(R.string.request_inherit_hint), style = MaterialTheme.typography.bodyMedium)
         PreferenceSection {
         Text(stringResource(R.string.request_client), style = MaterialTheme.typography.titleMedium)
