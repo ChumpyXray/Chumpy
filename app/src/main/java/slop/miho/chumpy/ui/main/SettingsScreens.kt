@@ -1187,7 +1187,10 @@ fun ConnectionScreen(
                         showSelectedLabel = true,
                         options = listOf(
                             IconChoice(R.drawable.ic_happ, R.string.spoof_as_happ, SpoofMode.HAPP),
-                            IconChoice(R.drawable.ic_incy, R.string.spoof_as_incy, SpoofMode.INCY),
+                            IconChoice(R.string.spoof_as_incy, SpoofMode.INCY) {
+                                Icon(painterResource(R.drawable.ic_incy), contentDescription = null,
+                                    modifier = Modifier.size(width = 36.dp, height = 24.dp))
+                            },
                             IconChoice(R.drawable.ic_block, R.string.per_app_disabled, SpoofMode.OFF),
                         ),
                         selected = settings.spoofMode,
