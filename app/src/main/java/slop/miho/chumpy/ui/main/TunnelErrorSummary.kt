@@ -10,7 +10,7 @@ internal fun tunnelErrorSummary(rawError: String): Int {
 
     return when {
         has("address already in use", "eaddrinuse") -> R.string.tunnel_error_port_busy
-        has("geosite.dat", "geoip.dat", "failed to load geosite", "failed to load geoip",
+        has("geodata", "базу маршрутизации", "geosite.dat", "geoip.dat", "failed to load geosite", "failed to load geoip",
             "failed to load geo site", "failed to load geo ip", "failed to check code") ->
             R.string.tunnel_error_geodata
         has("unknown transport protocol", "unknown protocol", "unknown config id",

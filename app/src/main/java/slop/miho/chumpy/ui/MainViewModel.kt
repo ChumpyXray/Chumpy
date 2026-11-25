@@ -450,7 +450,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    val tunnelStatus: StateFlow<TunnelStatus> = tunnelClient.status
+    private val preparingConnection = MutableStateFlow(false)
+    private val preparationError = MutableStateFlow<String?>(null)
+    private val preparationLog = MutableStateFlow<String?>(null)
+    val tunnelStatus: StateFlow<TunnelStatus> = combine(tunnelClient.status, preparingConnection, preparationError) { status, preparing, error ->
+        if (preparing) TunnelStatus(TunnelState.CONNECTING)
+        else status.copy(error = error ?: status.error)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, tunnelClient.status.value)
 
     private var connectJob: Job? = null
     private val connectGeneration = java.util.concurrent.atomic.AtomicInteger()
@@ -501,7 +507,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     val coreLogs: StateFlow<String?> = flow {
         while (true) {
-            emit(tunnelClient.coreLogs())
+            emit(listOfNotNull(tunnelClient.coreLogs(), preparationLog.value).joinToString("\n").ifEmpty { null })
             delay(1000)
         }
     }.flowOn(Dispatchers.IO).distinctUntilChanged()
@@ -776,6 +782,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnect() {
         val generation = connectGeneration.incrementAndGet()
         connectJob?.cancel()
+        preparingConnection.value = false
+        preparationError.value = null
         viewModelScope.launch(Dispatchers.IO) {
             configurationMutex.withLock {
                 if (generation == connectGeneration.get()) tunnelClient.disconnect()
@@ -787,10 +795,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         profile: ProfileEntity? = _servers.value.profiles.firstOrNull { it.id == connection.value.selectedProfileId }
             ?: _servers.value.profiles.firstOrNull(),
     ) {
-        profile ?: return
+        if (profile == null) {
+            preparationError.value = app.getString(R.string.error_no_config)
+            return
+        }
         val requestedConnection = connection.value
         val generation = connectGeneration.incrementAndGet()
         connectJob?.cancel()
+        preparationError.value = null
+        preparingConnection.value = true
         connectJob = viewModelScope.launch(Dispatchers.IO) {
             configurationMutex.withLock {
                 try {
@@ -842,7 +855,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    if (generation == connectGeneration.get()) _servers.update { it.copy(error = e.message ?: app.getString(R.string.error_unknown)) }
+                    if (generation == connectGeneration.get()) {
+                        val message = e.message ?: app.getString(R.string.error_unknown)
+                        preparationError.value = message
+                        preparationLog.value = "E/Connection preparation: ${e.javaClass.simpleName}: ${message.take(2000)}"
+                        Log.e("Chumpy/Connect", "Connection preparation failed", e)
+                        _servers.update { it.copy(error = message) }
+                    }
+                } finally {
+                    if (generation == connectGeneration.get()) preparingConnection.value = false
                 }
             }
         }
