@@ -97,8 +97,8 @@ object HappSpoof {
         "x-device-model" to fingerprint.deviceModel,
         "accept-encoding" to "gzip",
     ).let { headers ->
-        if (!fingerprint.sendHwid) headers - "x-hwid"
-        else if (fingerprint.incy) headers + ("X-Device-ID" to fingerprint.hwid)
+        if (!fingerprint.sendHwid) headers
+        else if (fingerprint.incy) headers + mapOf("x-hwid" to fingerprint.hwid, "X-Device-ID" to fingerprint.hwid)
         else headers + ("x-hwid" to fingerprint.hwid)
     }
 
