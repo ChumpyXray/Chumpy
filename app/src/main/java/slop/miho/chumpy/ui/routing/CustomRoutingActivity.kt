@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.ui.Alignment
@@ -116,6 +119,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
     val scope = rememberCoroutineScope()
     val currentValue by androidx.compose.runtime.rememberUpdatedState(value)
     var importing by remember { mutableStateOf(false) }
+    var loadingSource by remember { mutableStateOf<CategorySource?>(null) }
     var importGeoip by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     var geositeCategories by remember { mutableStateOf(emptyList<String>()) }
@@ -154,6 +158,8 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
             notice = resources.getString(R.string.custom_routing_https_required)
             return
         }
+        loadingSource = source
+        notice = null
         scope.launch {
             importing = true
             val result = withContext(Dispatchers.IO) {
@@ -174,6 +180,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                 }
             }
             importing = false
+            loadingSource = null
             result.onSuccess { names ->
                 if (url != (if (source == CategorySource.GEOSITE) currentValue.geositeUrl else currentValue.geoipUrl)) return@onSuccess
                 if (source == CategorySource.GEOSITE) geositeCategories = names else geoipCategories = names
@@ -304,7 +311,13 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                 val url = if (source == CategorySource.GEOSITE) value.geositeUrl else value.geoipUrl
                 FilledTonalButton(enabled = !importing && url.isNotBlank(), onClick = { loadCategories(source) },
                     modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.custom_routing_load_categories,
+                    if (loadingSource == source) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(stringResource(
+                        if (loadingSource == source) R.string.custom_routing_loading_categories
+                        else R.string.custom_routing_load_categories,
                         if (source == CategorySource.GEOSITE) "GeoSite" else "GeoIP"))
                 }
             }
