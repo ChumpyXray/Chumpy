@@ -163,8 +163,10 @@ import slop.miho.chumpy.ui.components.CookieBackdrop
 import slop.miho.chumpy.ui.components.EmojiFlag
 import slop.miho.chumpy.ui.components.ErrorCard
 import slop.miho.chumpy.ui.components.InfoChip
+import slop.miho.chumpy.ui.components.EmojiStickers
 import slop.miho.chumpy.ui.components.PrideFlagIcon
 import slop.miho.chumpy.ui.components.SubmitFieldRow
+import slop.miho.chumpy.ui.components.splitLeadingEmoji
 import slop.miho.chumpy.ui.components.splitLeadingFlag
 import slop.miho.chumpy.ui.components.splitLeadingPrideFlag
 import slop.miho.chumpy.ui.components.rememberHapticPoke
@@ -2409,11 +2411,17 @@ private fun ServerRow(
     )
     // The flag the panel put at the front of the name moves into the icon slot; the
     // headline shows the name without it.
-    val (flag, splitTitle) = splitLeadingFlag(prideStripped)
+    val (flag, flagStripped) = splitLeadingFlag(prideStripped)
+    // The emoji some panels pack in past the flag, with the sticker setting on, come
+    // off the title too and ride the tile's corners as outlined stickers; while off
+    // they stay title text, exactly as they were.
+    val (stickers, stickerStripped) =
+        if (LocalUiSettings.current.emojiStickers) splitLeadingEmoji(flagStripped)
+        else emptyList<String>() to flagStripped
     // The addresses' curtain: a nameless row would have shown the address itself, so
     // the headline stands empty instead — the address keeps out of sight entirely.
     val masked = LocalUiSettings.current.maskAddresses
-    val title = splitTitle.ifEmpty { if (masked) "" else profile.server }
+    val title = stickerStripped.ifEmpty { if (masked) "" else profile.server }
     val darkRow = colors.surface.luminance() < 0.5f
     val cyclingHue = if (pride != null) prideHueCycle() else null
 
@@ -2574,6 +2582,14 @@ private fun ServerRow(
                             contentDescription = null,
                             modifier = Modifier.size(24.dp),
                             tint = iconColor,
+                        )
+                    }
+                    // The name's leading emoji as stickers around the tile, matching the
+                    // flag style — Twemoji or the system's own — with their white outline.
+                    if (stickers.isNotEmpty()) {
+                        EmojiStickers(
+                            emojis = stickers,
+                            twemoji = flagStyle == FlagStyle.TWEMOJI,
                         )
                     }
                 }

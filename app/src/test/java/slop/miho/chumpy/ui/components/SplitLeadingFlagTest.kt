@@ -74,3 +74,74 @@ class SplitLeadingFlagTest {
         assertEquals("🇩🇪 Германия", title)
     }
 }
+
+
+/**
+ * The leading-emoji split: with the sticker setting on, the emoji panels pack in front
+ * of a name (past its flag) come off the title and ride the region icon as stickers.
+ */
+class SplitLeadingEmojiTest {
+    @Test
+    fun `leading emoji become stickers`() {
+        val (stickers, title) = splitLeadingEmoji("⚡ Fast exit")
+        assertEquals(listOf("⚡"), stickers)
+        assertEquals("Fast exit", title)
+    }
+
+    @Test
+    fun `a run of emoji splits whole clusters`() {
+        val (stickers, title) = splitLeadingEmoji("🔥🚀 Premium line")
+        assertEquals(listOf("🔥", "🚀"), stickers)
+        assertEquals("Premium line", title)
+    }
+
+    @Test
+    fun `variation selector and zwj stay with their cluster`() {
+        val (stickers, title) = splitLeadingEmoji("❤️🏳️‍🌈 Party")
+        assertEquals(listOf("❤️", "🏳️‍🌈"), stickers)
+        assertEquals("Party", title)
+    }
+
+    @Test
+    fun `emoji in the middle and at the end stay in the title`() {
+        val (stickers, title) = splitLeadingEmoji("Frankfurt ⚡ fast ⚡")
+        assertEquals(emptyList<String>(), stickers)
+        assertEquals("Frankfurt ⚡ fast ⚡", title)
+    }
+
+    @Test
+    fun `no emoji comes back whole`() {
+        val (stickers, title) = splitLeadingEmoji("Frankfurt 1")
+        assertEquals(emptyList<String>(), stickers)
+        assertEquals("Frankfurt 1", title)
+    }
+
+    @Test
+    fun `a leading pride flag is not a sticker`() {
+        val (stickers, title) = splitLeadingEmoji("🏳️‍🌈 Pride node")
+        assertEquals(emptyList<String>(), stickers)
+        assertEquals("🏳️‍🌈 Pride node", title)
+    }
+
+    @Test
+    fun `a leading country flag is not a sticker`() {
+        // The flag split runs first; a stray flag reaching the emoji split stays put.
+        val (stickers, title) = splitLeadingEmoji("🇩🇪 Германия")
+        assertEquals(emptyList<String>(), stickers)
+        assertEquals("🇩🇪 Германия", title)
+    }
+
+    @Test
+    fun `whitespace between leading emoji is consumed`() {
+        val (stickers, title) = splitLeadingEmoji("🔥 🚀 Premium")
+        assertEquals(listOf("🔥", "🚀"), stickers)
+        assertEquals("Premium", title)
+    }
+
+    @Test
+    fun `a name of only emoji keeps an empty title`() {
+        val (stickers, title) = splitLeadingEmoji("🔥🚀")
+        assertEquals(listOf("🔥", "🚀"), stickers)
+        assertEquals("", title)
+    }
+}
