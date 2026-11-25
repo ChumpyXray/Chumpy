@@ -104,7 +104,7 @@
     <string name="subscription_request_title">Subscription request</string>
     <string name="happ_regenerate">Regenerate identity</string>
     <string name="happ_regenerate_title">Regenerate the identity?</string>
-    <string name="happ_regenerate_text">A new user ID and hardware ID take the old one\'s place — the panels will see a fresh device they have never met, and the current identity is gone for good.</string>
+    <string name="happ_regenerate_text">A new user ID and hardware ID take the old one\'s place - the panels will see a fresh device they have never met, and the current identity is gone for good.</string>
     <string name="happ_regenerate_confirm">Regenerate</string>
 
     <!-- Welcome (first run) -->
@@ -291,7 +291,7 @@
     <string name="stats_loss_warning">Packet loss too high: %1$d%%</string>
     <string name="stats_probes_caption">A probe every 15 s</string>
     <string name="stats_core_logs">Core logs</string>
-    <string name="stats_core_logs_empty">Nothing yet — connect the tunnel</string>
+    <string name="stats_core_logs_empty">Nothing yet - connect the tunnel</string>
     <string name="stats_core_logs_copy">Copy the logs</string>
     <string name="stats_waiting">Waiting for data…</string>
     <string name="stats_no_data">No data</string>
@@ -316,7 +316,7 @@
     <string name="notif_reconnected_title">Connection restored</string>
     <string name="notif_reconnected_text">Chumpy brought the tunnel back by itself.</string>
     <string name="notif_reconnect_failed_title">Reconnect failed</string>
-    <string name="notif_interrupted_off">The tunnel is down — Chumpy will not bring it back on its own.</string>
+    <string name="notif_interrupted_off">The tunnel is down - Chumpy will not bring it back on its own.</string>
     <string name="notif_action_reconnect">Reconnect</string>
     <string name="notif_action_disconnect_anyway">Disconnect anyway</string>
     <string name="notif_channel_updates">App updates</string>

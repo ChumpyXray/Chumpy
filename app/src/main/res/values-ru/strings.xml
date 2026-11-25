@@ -125,7 +125,7 @@
     <string name="happ_hwid">HWID</string>
     <string name="happ_regenerate">Пересоздать личность</string>
     <string name="happ_regenerate_title">Пересоздать личность?</string>
-    <string name="happ_regenerate_text">Новый ID пользователя и HWID займут место старых — панели увидят устройство, которое встречают впервые, а текущая личность исчезнет навсегда.</string>
+    <string name="happ_regenerate_text">Новый ID пользователя и HWID займут место старых - панели увидят устройство, которое встречают впервые, а текущая личность исчезнет навсегда.</string>
     <string name="happ_regenerate_confirm">Пересоздать</string>
 
     <!-- Первый запуск -->
@@ -181,8 +181,8 @@
     <string name="settings_navbar_blur_intensity">Насколько плотной и размытой становится панель</string>
     <string name="settings_classic_navbar">Классическая панель навигации</string>
     <string name="settings_classic_navbar_hint">Полная полоса внизу вместо плавающих пилюль</string>
-    <string name="settings_small_screen_forced_on">Компактная раскладка включена принудительно. Долгое нажатие — переключить</string>
-    <string name="settings_small_screen_forced_off">Компактная раскладка выключена принудительно. Долгое нажатие — переключить</string>
+    <string name="settings_small_screen_forced_on">Компактная раскладка включена принудительно. Долгое нажатие - переключить</string>
+    <string name="settings_small_screen_forced_off">Компактная раскладка выключена принудительно. Долгое нажатие - переключить</string>
 
     <!-- Настройки подключения -->
     <string name="settings_routing_global">Глобальный</string>
@@ -275,7 +275,7 @@
     <string name="stats_loss_warning">Слишком большие потери пакетов: %1$d%%</string>
     <string name="stats_probes_caption">Замер каждые 15 с</string>
     <string name="stats_core_logs">Логи ядра</string>
-    <string name="stats_core_logs_empty">Пока ничего — подключи туннель</string>
+    <string name="stats_core_logs_empty">Пока ничего - подключи туннель</string>
     <string name="stats_core_logs_copy">Скопировать логи</string>
     <string name="stats_waiting">Ждём данных…</string>
     <string name="stats_no_data">Нет данных</string>
@@ -299,7 +299,7 @@
     <string name="notif_reconnected_title">Соединение восстановлено</string>
     <string name="notif_reconnected_text">Chumpy сама вернула туннель.</string>
     <string name="notif_reconnect_failed_title">Не удалось переподключиться</string>
-    <string name="notif_interrupted_off">Туннель отключён — Chumpy не станет поднимать его сама.</string>
+    <string name="notif_interrupted_off">Туннель отключён - Chumpy не станет поднимать его сама.</string>
     <string name="notif_action_reconnect">Переподключить</string>
     <string name="notif_action_disconnect_anyway">Всё равно отключить</string>
     <string name="notif_channel_updates">Обновления приложения</string>
@@ -343,8 +343,8 @@
     <string name="phone_wallpaper_qr">Сканируй телефоном, чтобы отправить обои</string>
     <string name="phone_wallpaper_instructions">Подключи телефон к той же локальной сети. Сканируй QR-код или открой адрес в браузере и введи код. Выбери изображение и отправь его.</string>
     <string name="wallpapers_move_hint_controller">Удерживайте OK, чтобы переместить обои</string>
-    <string name="wallpapers_move_controls">Стрелки — перемещение · Меню — масштаб · OK — сохранить · Назад — отменить</string>
-    <string name="wallpapers_zoom_controls">Стрелки — масштаб · Меню — перемещение · OK — сохранить · Назад — отменить</string>
+    <string name="wallpapers_move_controls">Стрелки - перемещение · Меню - масштаб · OK - сохранить · Назад - отменить</string>
+    <string name="wallpapers_zoom_controls">Стрелки - масштаб · Меню - перемещение · OK - сохранить · Назад - отменить</string>
     <string name="error_geodata_source_missing">В базе %1$s нет категорий %2$s, а подписка не указала адрес их загрузки. Обновите подписку или запросите базу у провайдера.</string>
     <string name="error_geodata_categories">База провайдера не содержит нужных категорий: %1$s.</string>
     <string name="error_geodata_download">Не удалось подготовить базу маршрутизации подписки: %1$s</string>
@@ -392,14 +392,14 @@
     <string name="custom_routing_move_up">Поднять: %1$s</string>
     <string name="custom_routing_move_down">Опустить: %1$s</string>
     <string name="custom_routing_import_required">Сначала импортируйте выбранный файл GeoSite или GeoIP.</string>
-    <string name="custom_routing_operation_error">Не удалось загрузить базу. Проверьте файл или ссылку. Подробности — в логах.</string>
+    <string name="custom_routing_operation_error">Не удалось загрузить базу. Проверьте файл или ссылку. Подробности - в логах.</string>
     <string name="happ_send_hwid">Отправлять HWID</string>
     <string name="happ_send_hwid_on">Передавать идентификатор устройства при подмене клиента</string>
     <string name="happ_send_hwid_off">Не передавать идентификатор устройства</string>
     <string name="subscription_request_title">Запрос подписки</string>
     <string name="per_app_only_empty">Выберите хотя бы одно установленное приложение для VPN</string>
     <string name="subscription_request_settings">Настройки запроса и HWID</string>
-    <string name="per_app_bypass_mode">Выбранные — без VPN</string>
+    <string name="per_app_bypass_mode">Выбранные - без VPN</string>
     <string name="per_app_only_mode">VPN только выбранным</string>
     <plurals name="per_app_only_count">
         <item quantity="one">VPN только для %1$d приложения</item>

@@ -332,7 +332,7 @@ class ChumpyVpnService : VpnService() {
             // consent — that would take the newcomer down with us.
             val foreign = foreignVpnHoldsTheDefault()
             if (foreign || prepare(this) != null) {
-                Log.w(TAG, "The VPN authorization is gone — or another VPN holds the default — and onRevoke never came; stopping")
+                Log.w(TAG, "The VPN authorization is gone - or another VPN holds the default - and onRevoke never came; stopping")
                 val auto = ConnectionStore.autoReconnectFresh(this)
                 if (foreign && auto) autoReconnectAttempts++
                 // The promise text only while the answer is coming: beyond the cap, the
