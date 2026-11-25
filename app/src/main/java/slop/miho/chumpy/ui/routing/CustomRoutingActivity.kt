@@ -36,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -111,6 +112,7 @@ class CustomRoutingActivity : ControllerActivity() {
 @Composable
 private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: () -> Unit, onBack: () -> Unit, onChange: (CustomRouting) -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val currentValue by androidx.compose.runtime.rememberUpdatedState(value)
     var importing by remember { mutableStateOf(false) }
@@ -175,7 +177,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
             result.onSuccess { names ->
                 if (url != (if (source == CategorySource.GEOSITE) currentValue.geositeUrl else currentValue.geoipUrl)) return@onSuccess
                 if (source == CategorySource.GEOSITE) geositeCategories = names else geoipCategories = names
-                notice = context.getString(slop.miho.chumpy.R.string.custom_routing_loaded_count, names.size)
+                notice = resources.getString(slop.miho.chumpy.R.string.custom_routing_loaded_count, names.size)
             }.onFailure { notice = it.message ?: "Could not load categories" }
         }
     }
@@ -216,7 +218,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                 onChange(if (filename == GeodataFiles.USER_GEOIP_FILE) currentValue.copy(customGeoip = true, geodataRevision = currentValue.geodataRevision + 1)
                     else currentValue.copy(customGeosite = true, geodataRevision = currentValue.geodataRevision + 1))
                 if (filename == GeodataFiles.USER_GEOIP_FILE) geoipCategories = importedCategories else geositeCategories = importedCategories
-                notice = context.getString(slop.miho.chumpy.R.string.custom_routing_imported_count, importedCategories.size)
+                notice = resources.getString(slop.miho.chumpy.R.string.custom_routing_imported_count, importedCategories.size)
             }.onFailure { notice = it.message ?: "Could not import geodata" }
         }
     }
@@ -331,8 +333,8 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                     value.customGeoip to GeodataFiles.USER_GEOIP_FILE,
                 ).all { (enabled, name) -> !enabled || File(directory, name).let { it.isFile && it.length() > 0 } }
                 when {
-                    !valid -> notice = context.getString(R.string.custom_routing_https_required)
-                    !importedReady -> notice = context.getString(R.string.custom_routing_import_required)
+                    !valid -> notice = resources.getString(R.string.custom_routing_https_required)
+                    !importedReady -> notice = resources.getString(R.string.custom_routing_import_required)
                     else -> onSave()
                 }
             }) { Text(stringResource(R.string.custom_routing_save)) }
