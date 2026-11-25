@@ -393,4 +393,18 @@
     <string name="custom_routing_move_down">Опустить: %1$s</string>
     <string name="custom_routing_import_required">Сначала импортируйте выбранный файл GeoSite или GeoIP.</string>
     <string name="custom_routing_operation_error">Не удалось загрузить базу. Проверьте файл или ссылку. Подробности — в логах.</string>
+    <string name="happ_send_hwid">Отправлять HWID</string>
+    <string name="happ_send_hwid_on">Передавать идентификатор устройства при подмене клиента</string>
+    <string name="happ_send_hwid_off">Не передавать идентификатор устройства</string>
+    <string name="subscription_request_title">Запрос подписки</string>
+    <string name="per_app_only_empty">Выберите хотя бы одно установленное приложение для VPN</string>
+    <string name="subscription_request_settings">Настройки запроса и HWID</string>
+    <string name="per_app_bypass_mode">Выбранные — без VPN</string>
+    <string name="per_app_only_mode">VPN только выбранным</string>
+    <plurals name="per_app_only_count">
+        <item quantity="one">VPN только для %1$d приложения</item>
+        <item quantity="few">VPN только для %1$d приложений</item>
+        <item quantity="many">VPN только для %1$d приложений</item>
+        <item quantity="other">VPN только для %1$d приложения</item>
+    </plurals>
 </resources>
