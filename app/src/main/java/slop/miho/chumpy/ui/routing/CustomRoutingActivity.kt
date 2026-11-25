@@ -320,12 +320,21 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
         notice?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = dirty && !importing,
             onClick = {
-                val valid = listOf(value.geositeUrl, value.geoipUrl).all { raw ->
+                val valid = !value.enabled || listOf(value.geositeUrl, value.geoipUrl).all { raw ->
                     raw.isBlank() || raw.trim().toHttpUrlOrNull()?.let {
                         it.isHttps && it.username.isEmpty() && it.password.isEmpty()
                     } == true
                 }
-                if (valid) onSave() else notice = context.getString(R.string.custom_routing_https_required)
+                val directory = File(context.filesDir, "xray_assets")
+                val importedReady = !value.enabled || listOf(
+                    value.customGeosite to GeodataFiles.USER_GEOSITE_FILE,
+                    value.customGeoip to GeodataFiles.USER_GEOIP_FILE,
+                ).all { (enabled, name) -> !enabled || File(directory, name).let { it.isFile && it.length() > 0 } }
+                when {
+                    !valid -> notice = context.getString(R.string.custom_routing_https_required)
+                    !importedReady -> notice = context.getString(R.string.custom_routing_import_required)
+                    else -> onSave()
+                }
             }) { Text(stringResource(R.string.custom_routing_save)) }
     }
 }

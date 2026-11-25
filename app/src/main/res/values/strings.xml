@@ -408,4 +408,5 @@
     <string name="request_save_error">Could not read or save settings. See logs.</string>
     <string name="custom_routing_move_up">Move %1$s up</string>
     <string name="custom_routing_move_down">Move %1$s down</string>
+    <string name="custom_routing_import_required">Import the selected GeoSite or GeoIP file first.</string>
 </resources>

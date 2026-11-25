@@ -391,4 +391,5 @@
     <string name="request_save_error">Не удалось прочитать или сохранить настройки. См. логи.</string>
     <string name="custom_routing_move_up">Поднять: %1$s</string>
     <string name="custom_routing_move_down">Опустить: %1$s</string>
+    <string name="custom_routing_import_required">Сначала импортируйте выбранный файл GeoSite или GeoIP.</string>
 </resources>
