@@ -331,7 +331,7 @@ private fun EntryField(
     onQueryPrefix: (String?) -> Unit,
     onChange: (List<String>) -> Unit,
 ) {
-    var text by remember(entries) { mutableStateOf(entries.joinToString("\n")) }
+    var text by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(entries.joinToString("\n")) }
     val current = text.substringAfterLast('\n')
     val prefix = when {
         current.startsWith("geosite:", ignoreCase = true) -> "geosite:"

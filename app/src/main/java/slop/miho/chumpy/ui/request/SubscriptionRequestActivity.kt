@@ -31,6 +31,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import slop.miho.chumpy.Graph
 import slop.miho.chumpy.data.SettingsStore
 import slop.miho.chumpy.db.SubscriptionRequestSettings
@@ -72,10 +77,13 @@ private fun RequestSettingsScreen(
     val scope = rememberCoroutineScope()
     var loaded by remember { mutableStateOf(initial) }
     androidx.compose.runtime.LaunchedEffect(Unit) { loaded = load() }
-    val value = loaded ?: SubscriptionRequestSettings()
+    val saveMutex = remember { Mutex() }
+    val value = loaded ?: return
     fun commit(next: SubscriptionRequestSettings) {
         loaded = next
-        scope.launch { save(next) }
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) { saveMutex.withLock { save(next) } }
+        }
     }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
