@@ -151,7 +151,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
         if (importing) return
         val url = if (source == CategorySource.GEOSITE) value.geositeUrl else value.geoipUrl
         if (url.isBlank()) {
-            notice = "Set a geodata URL first"
+            notice = resources.getString(R.string.custom_routing_https_required)
             return
         }
         scope.launch {
@@ -178,7 +178,10 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                 if (url != (if (source == CategorySource.GEOSITE) currentValue.geositeUrl else currentValue.geoipUrl)) return@onSuccess
                 if (source == CategorySource.GEOSITE) geositeCategories = names else geoipCategories = names
                 notice = resources.getString(slop.miho.chumpy.R.string.custom_routing_loaded_count, names.size)
-            }.onFailure { notice = it.message ?: "Could not load categories" }
+            }.onFailure {
+                android.util.Log.e("Chumpy/Routing", "Could not load categories", it)
+                notice = resources.getString(R.string.custom_routing_operation_error)
+            }
         }
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -219,7 +222,10 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                     else currentValue.copy(customGeosite = true, geodataRevision = currentValue.geodataRevision + 1))
                 if (filename == GeodataFiles.USER_GEOIP_FILE) geoipCategories = importedCategories else geositeCategories = importedCategories
                 notice = resources.getString(slop.miho.chumpy.R.string.custom_routing_imported_count, importedCategories.size)
-            }.onFailure { notice = it.message ?: "Could not import geodata" }
+            }.onFailure {
+                android.util.Log.e("Chumpy/Routing", "Could not import geodata", it)
+                notice = resources.getString(R.string.custom_routing_operation_error)
+            }
         }
     }
     PreferenceEditor(R.string.custom_routing_title, onBack) {
