@@ -479,7 +479,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     previous.bypassLan != current.bypassLan
                 // The custom lists are part of the config itself — a write from their own
                 // screen reloads the running tunnel in place, like the mode's tile does.
-                val customChanged = previous.customRouting != current.customRouting
+                val customChanged = previous.customRouting != current.customRouting &&
+                    (previous.customRouting.enabled || current.customRouting.enabled)
                 if ((bypassChanged || customChanged) &&
                     tunnelStatus.value.state in setOf(TunnelState.UP, TunnelState.CONNECTING)) {
                     applyConfigAndConnect()

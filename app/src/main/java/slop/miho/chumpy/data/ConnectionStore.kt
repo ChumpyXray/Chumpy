@@ -37,13 +37,13 @@ data class CustomRouting(
 
     /** The logical database name to the imported file, for [GeodataFiles.prepare]. */
     val geodataOverrides: Map<String, String>
-        get() = buildMap {
+        get() = if (!enabled) emptyMap() else buildMap {
             if (customGeosite) put("geosite.dat", GeodataFiles.USER_GEOSITE_FILE)
             if (customGeoip) put("geoip.dat", GeodataFiles.USER_GEOIP_FILE)
         }
 
     val geodataSources: Map<String, String>
-        get() = buildMap {
+        get() = if (!enabled) emptyMap() else buildMap {
             geositeUrl.trim().takeIf(String::isNotEmpty)?.let { put("geosite.dat", it) }
             geoipUrl.trim().takeIf(String::isNotEmpty)?.let { put("geoip.dat", it) }
         }
