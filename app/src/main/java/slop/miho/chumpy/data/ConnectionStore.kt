@@ -29,6 +29,7 @@ data class CustomRouting(
     val proxy: List<String> = emptyList(),
     val customGeosite: Boolean = false,
     val customGeoip: Boolean = false,
+    val geodataRevision: Long = 0,
     val geositeUrl: String = "",
     val geoipUrl: String = "",
     val stageOrder: List<CustomRouteStage> = CustomRouteStage.entries.toList(),
@@ -246,6 +247,7 @@ object ConnectionStore {
         .put(KEY_CUSTOM_PROXY, JSONArray(custom.proxy))
         .put(KEY_CUSTOM_GEOSITE, custom.customGeosite)
         .put(KEY_CUSTOM_GEOIP, custom.customGeoip)
+        .put("geodata_revision", custom.geodataRevision)
         .put(KEY_CUSTOM_GEOSITE_URL, custom.geositeUrl)
         .put(KEY_CUSTOM_GEOIP_URL, custom.geoipUrl)
         .put(KEY_CUSTOM_STAGE_ORDER, JSONArray(custom.stageOrder.map { it.name }))
@@ -257,6 +259,7 @@ object ConnectionStore {
         proxy = json.optJSONArray(KEY_CUSTOM_PROXY)?.strings() ?: emptyList(),
         customGeosite = json.optBoolean(KEY_CUSTOM_GEOSITE, false),
         customGeoip = json.optBoolean(KEY_CUSTOM_GEOIP, false),
+        geodataRevision = json.optLong("geodata_revision", 0),
         geositeUrl = json.optString(KEY_CUSTOM_GEOSITE_URL),
         geoipUrl = json.optString(KEY_CUSTOM_GEOIP_URL),
         stageOrder = json.optJSONArray(KEY_CUSTOM_STAGE_ORDER)?.let { array ->

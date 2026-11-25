@@ -216,7 +216,8 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
             }
             importing = false
             result.onSuccess { (filename, importedCategories) ->
-                onChange(if (filename == GeodataFiles.USER_GEOIP_FILE) currentValue.copy(customGeoip = true) else currentValue.copy(customGeosite = true))
+                onChange(if (filename == GeodataFiles.USER_GEOIP_FILE) currentValue.copy(customGeoip = true, geodataRevision = currentValue.geodataRevision + 1)
+                    else currentValue.copy(customGeosite = true, geodataRevision = currentValue.geodataRevision + 1))
                 if (filename == GeodataFiles.USER_GEOIP_FILE) geoipCategories = importedCategories else geositeCategories = importedCategories
                 notice = context.getString(slop.miho.chumpy.R.string.custom_routing_imported_count, importedCategories.size)
             }.onFailure { notice = it.message ?: "Could not import geodata" }
