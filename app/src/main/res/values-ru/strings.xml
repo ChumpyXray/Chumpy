@@ -387,4 +387,5 @@
     <string name="request_omit">Не отправлять</string>
     <string name="custom_routing_save">Сохранить правила</string>
     <string name="custom_routing_https_required">Нужны HTTPS-ссылки без логина и пароля в адресе.</string>
+    <string name="custom_routing_load_categories">Загрузить категории %1$s</string>
 </resources>

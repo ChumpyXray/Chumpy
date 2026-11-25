@@ -117,13 +117,11 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
     val scope = rememberCoroutineScope()
     val currentValue by androidx.compose.runtime.rememberUpdatedState(value)
     var importing by remember { mutableStateOf(false) }
-    var automaticCatalogRequests by remember { mutableStateOf(emptySet<CategorySource>()) }
     var importGeoip by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     var geositeCategories by remember { mutableStateOf(emptyList<String>()) }
     var geoipCategories by remember { mutableStateOf(emptyList<String>()) }
     LaunchedEffect(value.geositeUrl, value.geoipUrl, value.customGeosite, value.customGeoip) {
-        automaticCatalogRequests = emptySet()
         geositeCategories = emptyList()
         geoipCategories = emptyList()
         val catalogs = withContext(Dispatchers.IO) {
@@ -254,19 +252,16 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
         EntryField(
             stringResource(slop.miho.chumpy.R.string.custom_routing_target_blocked), value.blocked,
             categorySuggestionsGeo, categorySuggestionsIp,
-            onQueryPrefix = { prefix -> maybeLoadCatalog(prefix, value, geositeCategories, geoipCategories, automaticCatalogRequests, { automaticCatalogRequests = it }, ::loadCategories) },
             onChange = { onChange(value.copy(blocked = it)) },
         )
         EntryField(
             stringResource(slop.miho.chumpy.R.string.custom_routing_target_direct), value.direct,
             categorySuggestionsGeo, categorySuggestionsIp,
-            onQueryPrefix = { prefix -> maybeLoadCatalog(prefix, value, geositeCategories, geoipCategories, automaticCatalogRequests, { automaticCatalogRequests = it }, ::loadCategories) },
             onChange = { onChange(value.copy(direct = it)) },
         )
         EntryField(
             stringResource(slop.miho.chumpy.R.string.custom_routing_target_proxy), value.proxy,
             categorySuggestionsGeo, categorySuggestionsIp,
-            onQueryPrefix = { prefix -> maybeLoadCatalog(prefix, value, geositeCategories, geoipCategories, automaticCatalogRequests, { automaticCatalogRequests = it }, ::loadCategories) },
             onChange = { onChange(value.copy(proxy = it)) },
         )
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -292,6 +287,16 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            CategorySource.entries.forEach { source ->
+                val url = if (source == CategorySource.GEOSITE) value.geositeUrl else value.geoipUrl
+                FilledTonalButton(enabled = !importing && url.isNotBlank(), onClick = { loadCategories(source) },
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.custom_routing_load_categories,
+                        if (source == CategorySource.GEOSITE) "GeoSite" else "GeoIP"))
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geosite), modifier = Modifier.weight(1f))
             Switch(value.customGeosite, onCheckedChange = { onChange(value.copy(customGeosite = it)) })
@@ -330,36 +335,12 @@ private fun stageLabel(stage: CustomRouteStage): String = stringResource(
     },
 )
 
-private fun maybeLoadCatalog(
-    prefix: String?,
-    settings: CustomRouting,
-    geositeCategories: List<String>,
-    geoipCategories: List<String>,
-    attempted: Set<CategorySource>,
-    updateAttempted: (Set<CategorySource>) -> Unit,
-    load: (CategorySource) -> Unit,
-) {
-    val source = when (prefix) {
-        "geosite:" -> CategorySource.GEOSITE
-        "geoip:" -> CategorySource.GEOIP
-        else -> return
-    }
-    val ready = if (source == CategorySource.GEOSITE) geositeCategories.isNotEmpty() else geoipCategories.isNotEmpty()
-    val imported = if (source == CategorySource.GEOSITE) settings.customGeosite else settings.customGeoip
-    val url = if (source == CategorySource.GEOSITE) settings.geositeUrl else settings.geoipUrl
-    if (!ready && !imported && url.isNotBlank() && source !in attempted) {
-        updateAttempted(attempted + source)
-        load(source)
-    }
-}
-
 @Composable
 private fun EntryField(
     title: String,
     entries: List<String>,
     geositeCategories: List<String>,
     geoipCategories: List<String>,
-    onQueryPrefix: (String?) -> Unit,
     onChange: (List<String>) -> Unit,
 ) {
     var text by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(entries.joinToString("\n")) }
@@ -388,12 +369,7 @@ private fun EntryField(
         value = text,
         onValueChange = { next ->
             update(next)
-            val lastLine = next.substringAfterLast('\n')
-            onQueryPrefix(when {
-                lastLine.startsWith("geosite:", true) -> "geosite:"
-                lastLine.startsWith("geoip:", true) -> "geoip:"
-                else -> null
-            })
+
         },
         label = title,
         singleLine = false,
