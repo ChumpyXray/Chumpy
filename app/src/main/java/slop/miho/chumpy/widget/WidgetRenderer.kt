@@ -2,6 +2,8 @@ package slop.miho.chumpy.widget
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.withTranslation
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -91,10 +93,10 @@ object WidgetRenderer {
         pins: List<WidgetPin>,
         colors: OrbWidgetColors,
     ): Bitmap {
-        if (width <= 0 || height <= 0) return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        if (width <= 0 || height <= 0) return createBitmap(1, 1)
         // A fresh bitmap every paint: a repaint is a state change, and caching would let
         // one paint erase the canvas under another's RemoteViews hand-off.
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(width, height)
         paint(context, Canvas(bitmap), width, height, state, face, pins, colors)
         return bitmap
     }
@@ -130,10 +132,9 @@ object WidgetRenderer {
         val flagBox = short * 0.33f
         val flagLayout = flagLayout(context, face.flag, flagStyle, flagBox * 0.85f)
         if (flagLayout != null) {
-            canvas.save()
-            canvas.translate(cx - flagLayout.width / 2f, cy - flagLayout.height / 2f)
-            flagLayout.draw(canvas)
-            canvas.restore()
+            canvas.withTranslation(cx - flagLayout.width / 2f, cy - flagLayout.height / 2f) {
+                flagLayout.draw(this)
+            }
         } else {
             drawVector(context, R.drawable.ic_public, content, canvas, cx, cy, flagBox)
         }
@@ -195,13 +196,12 @@ object WidgetRenderer {
             val glyphBox = side * 0.70f
             val glyph = flagLayout(context, pin.flag, flagStyle, glyphBox * 0.85f)
             if (glyph != null) {
-                canvas.save()
-                canvas.translate(
+                canvas.withTranslation(
                     tile.left + (tile.width() - glyph.width) / 2f,
                     tile.top + (tile.height() - glyph.height) / 2f,
-                )
-                glyph.draw(canvas)
-                canvas.restore()
+                ) {
+                    glyph.draw(this)
+                }
             } else {
                 drawVector(
                     context,

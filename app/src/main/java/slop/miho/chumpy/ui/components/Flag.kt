@@ -2,6 +2,7 @@ package slop.miho.chumpy.ui.components
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.core.graphics.createBitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PorterDuff
@@ -395,7 +396,7 @@ private fun renderSticker(context: Context, emoji: String, twemoji: Boolean, box
     val metrics = paint.fontMetrics
     val side = boxPx.toInt().coerceAtLeast(1)
     // The glyph bitmap: the emoji alone, centered.
-    val glyph = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+    val glyph = createBitmap(side, side)
     Canvas(glyph).drawText(
         emoji,
         (boxPx - width) / 2f,
@@ -404,7 +405,7 @@ private fun renderSticker(context: Context, emoji: String, twemoji: Boolean, box
     )
     // The sticker: the silhouette copies go down first, white-tinted; the color glyph
     // lands on top after, re-covering the middle and leaving the white ring around it.
-    val sticker = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+    val sticker = createBitmap(side, side)
     val canvas = Canvas(sticker)
     val silhouette = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         colorFilter = PorterDuffColorFilter(android.graphics.Color.WHITE, PorterDuff.Mode.SRC_IN)

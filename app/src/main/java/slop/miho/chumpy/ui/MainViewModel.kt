@@ -1619,16 +1619,21 @@ internal suspend fun refreshSubscriptionsForUpgrade(
         currentCoroutineContext().ensureActive()
         if (id in completed || !refresh(id)) continue
         completed.add(id)
-        if (!prefs.edit().putLong("pending_version_code", versionCode)
-                .putStringSet("completed_subscriptions", completed.toSet()).commit()) {
+        val progress = prefs.edit()
+        progress.putLong("pending_version_code", versionCode)
+        progress.putStringSet("completed_subscriptions", completed.toSet())
+        if (!progress.commit()) {
             Log.w("Chumpy/Upgrade", "Could not save subscription refresh progress")
             return
         }
     }
     currentCoroutineContext().ensureActive()
     if (completed.containsAll(subscriptionIds)) {
-        if (!prefs.edit().putLong("version_code", versionCode)
-                .remove("pending_version_code").remove("completed_subscriptions").commit()) {
+        val completion = prefs.edit()
+        completion.putLong("version_code", versionCode)
+        completion.remove("pending_version_code")
+        completion.remove("completed_subscriptions")
+        if (!completion.commit()) {
             Log.w("Chumpy/Upgrade", "Could not save completed parser upgrade")
         }
     }
