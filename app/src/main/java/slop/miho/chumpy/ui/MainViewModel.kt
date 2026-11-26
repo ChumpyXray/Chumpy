@@ -1150,6 +1150,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             (targetProfileId == null || it.id == targetProfileId) && (!automatic || it.needsAutomaticPing())
         }
         if (targets.isEmpty()) return
+        // Reserve this session's automatic attempt before asynchronous work can fail or emit.
+        automaticallyCheckedProfiles.addAll(targets.map { it.id })
         val subscriptionId = selectedSubscriptionId.value?.takeUnless { it == STANDALONE_SUBSCRIPTION_ID }
         val generation = ++sweepGeneration
         sweepJob?.cancel()
@@ -1169,7 +1171,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 pingingIds = if (targetProfileId == null) cleared else cleared + targetProfileId,
             )
         }
-        sweepJob = viewModelScope.launch {
+        sweepJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
                 val testUrl = connection.value.delayTestUrl
                 val allRows = repository.profilesOf(subscriptionId).first()
@@ -1257,11 +1259,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
                     sweepJob = null
-                    // The user may have selected another subscription while this queue was running.
-                    startServerSweep(automatic = true)
+                    // Only a newly selected subscription needs a follow-up, never this failed queue.
+                    val currentSubscription = selectedSubscriptionId.value?.takeUnless { it == STANDALONE_SUBSCRIPTION_ID }
+                    if (currentCoroutineContext().isActive && currentSubscription != subscriptionId) {
+                        startServerSweep(automatic = true)
+                    }
                 }
             }
         }
+        sweepJob?.start()
     }
 
     private suspend fun measureServerDelay(profile: ProfileEntity, testUrl: String): Long? =
