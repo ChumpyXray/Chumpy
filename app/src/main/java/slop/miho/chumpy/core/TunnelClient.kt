@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.os.RemoteException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -121,8 +122,9 @@ class TunnelClient(context: Context) {
             binder.linkToDeath(deathRecipient, 0)
             try {
                 remote.measureDelay(configJson, testUrl, callback)
-                // Keep the caller's permit until the native request actually finishes.
-                withContext(NonCancellable) { result.await() }
+                // The probe service normally replies within 53 seconds (binding + measurement).
+                // Retain the permit for native work, but recover if its callback is lost.
+                withContext(NonCancellable) { withTimeoutOrNull(60_000L) { result.await() } }
             } finally {
                 binder.unlinkToDeath(deathRecipient, 0)
             }
