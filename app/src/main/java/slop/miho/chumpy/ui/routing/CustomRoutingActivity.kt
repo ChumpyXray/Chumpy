@@ -188,7 +188,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
             result.onSuccess { names ->
                 if (url != (if (source == CategorySource.GEOSITE) currentValue.geositeUrl else currentValue.geoipUrl)) return@onSuccess
                 if (source == CategorySource.GEOSITE) geositeCategories = names else geoipCategories = names
-                notice = resources.getString(slop.miho.chumpy.R.string.custom_routing_loaded_count, names.size)
+                notice = resources.getQuantityString(R.plurals.custom_routing_loaded_count, names.size, names.size)
             }.onFailure {
                 android.util.Log.e("Chumpy/Routing", "Could not load categories", it)
                 notice = resources.getString(R.string.custom_routing_operation_error)
@@ -232,7 +232,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                 onChange(if (filename == GeodataFiles.USER_GEOIP_FILE) currentValue.copy(customGeoip = true, geodataRevision = currentValue.geodataRevision + 1)
                     else currentValue.copy(customGeosite = true, geodataRevision = currentValue.geodataRevision + 1))
                 if (filename == GeodataFiles.USER_GEOIP_FILE) geoipCategories = importedCategories else geositeCategories = importedCategories
-                notice = resources.getString(slop.miho.chumpy.R.string.custom_routing_imported_count, importedCategories.size)
+                notice = resources.getQuantityString(R.plurals.custom_routing_imported_count, importedCategories.size, importedCategories.size)
             }.onFailure {
                 android.util.Log.e("Chumpy/Routing", "Could not import geodata", it)
                 notice = resources.getString(R.string.custom_routing_operation_error)

@@ -1096,7 +1096,7 @@ fun ConnectionScreen(
                 ScreenLinkRow(
                     title = stringResource(R.string.custom_routing_title),
                     supporting = if (connection.customRouting.enabled) {
-                        stringResource(R.string.custom_routing_count, connection.customRouting.entryCount)
+                        pluralStringResource(R.plurals.custom_routing_count, connection.customRouting.entryCount, connection.customRouting.entryCount)
                     } else stringResource(R.string.custom_routing_off),
                     icon = R.drawable.ic_tune,
                     target = slop.miho.chumpy.ui.routing.CustomRoutingActivity::class.java,

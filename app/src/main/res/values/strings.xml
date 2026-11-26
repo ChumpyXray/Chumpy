@@ -174,13 +174,9 @@
     <string name="custom_routing_title">Custom routing</string>
     <string name="custom_routing_off">Blocked, direct and proxy rules</string>
     <string name="custom_routing_exclusive_hint">Custom routing is active; regional presets are disabled.</string>
-    <string name="custom_routing_chain_hint">When enabled, this chain replaces regional presets and panel routing.</string>
     <string name="custom_routing_enabled">Enable custom rules</string>
-    <string name="custom_routing_only_chain">Only this rule chain is used</string>
     <string name="custom_routing_order">Rule order</string>
     <string name="custom_routing_last_stage_fallback">Unmatched traffic always uses the VPN.</string>
-    <string name="custom_routing_sources_hint">Choose a ready-made source or enter your own HTTPS URL. Sources are used for geosite: and geoip: rules.</string>
-    <string name="custom_routing_trim_hint">Full files are cached for category suggestions; only selected categories are prepared for the running tunnel.</string>
     <string name="custom_routing_geosite_url">geosite.dat URL</string>
     <string name="custom_routing_geoip_url">geoip.dat URL</string>
     <string name="custom_routing_use_imported_geosite">Use imported geosite.dat</string>
@@ -189,13 +185,21 @@
     <string name="custom_routing_replace_geosite">Replace geosite.dat</string>
     <string name="custom_routing_import_geoip">Import geoip.dat</string>
     <string name="custom_routing_replace_geoip">Replace geoip.dat</string>
-    <string name="custom_routing_file_hint">Files must be Xray geosite.dat / geoip.dat protobuf databases.</string>
-    <string name="custom_routing_loaded_count">Loaded %1$d categories</string>
-    <string name="custom_routing_imported_count">Imported %1$d categories</string>
+    <plurals name="custom_routing_loaded_count">
+        <item quantity="one">Loaded %1$d category</item>
+        <item quantity="other">Loaded %1$d categories</item>
+    </plurals>
+    <plurals name="custom_routing_imported_count">
+        <item quantity="one">Imported %1$d category</item>
+        <item quantity="other">Imported %1$d categories</item>
+    </plurals>
     <string name="custom_routing_target_blocked">Blocked</string>
     <string name="custom_routing_target_direct">Direct</string>
     <string name="custom_routing_target_proxy">Proxy</string>
-    <string name="custom_routing_count">%1$d custom entries</string>
+    <plurals name="custom_routing_count">
+        <item quantity="one">%1$d custom entry</item>
+        <item quantity="other">%1$d custom entries</item>
+    </plurals>
     <string name="per_app_only_empty">Pick at least one app to proxy</string>
     <string name="subscription_request_settings">Request and HWID settings</string>
     <string name="region_ru">Russia</string>
@@ -398,7 +402,6 @@
     <string name="tunnel_error_timeout">The connection took too long. Try again or choose another server.</string>
     <string name="tunnel_error_stopping">The VPN is still stopping. Wait a moment and try again.</string>
     <string name="tunnel_error_storage">The device is out of storage. Free some space and try again.</string>
-    <string name="request_inherit_hint">Empty fields use the app settings. Changes apply on the next subscription update.</string>
     <string name="request_client">Client</string>
     <string name="request_inherit">App default</string>
     <string name="request_off">Off</string>
@@ -416,7 +419,7 @@
     <string name="custom_routing_loading_percent">Loading %1$s: %2$d%%</string>
     <string name="subscription_request_pick">Choose a subscription</string>
     <string name="random_local_port">Random local port</string>
-    <string name="local_proxy_port">Local SOCKS port (1024-65535)</string>
+    <string name="local_proxy_port">Local SOCKS port (1024 to 65535)</string>
     <string name="local_port_reconnect">Applies on the next VPN connection. Turn off random selection to use the specified port.</string>
     <string name="error_naive_original_core">NaiveProxy is not supported by this Xray core. Choose another server.</string>
 </resources>

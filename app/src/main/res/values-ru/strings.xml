@@ -1,15 +1,16 @@
 <resources>
     <string name="custom_routing_title">Своя маршрутизация</string>
     <string name="custom_routing_off">Правила блокировки, обхода и прокси</string>
-    <string name="custom_routing_count">Свои правила: %1$d</string>
+    <plurals name="custom_routing_count">
+        <item quantity="one">%1$d своё правило</item>
+        <item quantity="few">%1$d своих правила</item>
+        <item quantity="many">%1$d своих правил</item>
+        <item quantity="other">%1$d своего правила</item>
+    </plurals>
     <string name="custom_routing_exclusive_hint">Своя маршрутизация включена; региональные пресеты отключены.</string>
-    <string name="custom_routing_chain_hint">При включении эта цепочка заменяет региональные пресеты и правила подписки.</string>
     <string name="custom_routing_enabled">Включить свои правила</string>
-    <string name="custom_routing_only_chain">Используется только эта цепочка</string>
     <string name="custom_routing_order">Порядок правил</string>
     <string name="custom_routing_last_stage_fallback">Трафик без совпадений всегда идёт через VPN.</string>
-    <string name="custom_routing_sources_hint">Выберите готовый источник или укажите HTTPS-ссылку. Источники используются для правил geosite: и geoip:.</string>
-    <string name="custom_routing_trim_hint">Полные файлы хранятся для подсказок категорий; перед запуском остаются только выбранные категории.</string>
     <string name="custom_routing_geosite_url">Ссылка на geosite.dat</string>
     <string name="custom_routing_geoip_url">Ссылка на geoip.dat</string>
     <string name="custom_routing_use_imported_geosite">Использовать импортированный geosite.dat</string>
@@ -18,9 +19,18 @@
     <string name="custom_routing_replace_geosite">Заменить geosite.dat</string>
     <string name="custom_routing_import_geoip">Импортировать geoip.dat</string>
     <string name="custom_routing_replace_geoip">Заменить geoip.dat</string>
-    <string name="custom_routing_file_hint">Нужны бинарные protobuf-файлы Xray geosite.dat / geoip.dat.</string>
-    <string name="custom_routing_loaded_count">Загружено категорий: %1$d</string>
-    <string name="custom_routing_imported_count">Импортировано категорий: %1$d</string>
+    <plurals name="custom_routing_loaded_count">
+        <item quantity="one">Загружена %1$d категория</item>
+        <item quantity="few">Загружены %1$d категории</item>
+        <item quantity="many">Загружено %1$d категорий</item>
+        <item quantity="other">Загружено %1$d категории</item>
+    </plurals>
+    <plurals name="custom_routing_imported_count">
+        <item quantity="one">Импортирована %1$d категория</item>
+        <item quantity="few">Импортированы %1$d категории</item>
+        <item quantity="many">Импортировано %1$d категорий</item>
+        <item quantity="other">Импортировано %1$d категории</item>
+    </plurals>
     <string name="custom_routing_target_blocked">Блокировать</string>
     <string name="custom_routing_target_direct">Напрямую</string>
     <string name="custom_routing_target_proxy">Через прокси</string>
@@ -381,7 +391,6 @@
     <string name="tunnel_error_timeout">Слишком долго ждали ответа. Попробуйте снова или выберите другой сервер.</string>
     <string name="tunnel_error_stopping">VPN ещё отключается. Подождите немного и попробуйте снова.</string>
     <string name="tunnel_error_storage">На устройстве закончилось место. Освободите немного памяти и попробуйте снова.</string>
-    <string name="request_inherit_hint">Пустые поля используют настройки приложения. Изменения применятся при следующем обновлении подписки.</string>
     <string name="request_client">Клиент</string>
     <string name="request_inherit">Как в настройках</string>
     <string name="request_off">Выключено</string>
@@ -413,7 +422,7 @@
     <string name="custom_routing_loading_percent">Загрузка %1$s: %2$d%%</string>
     <string name="subscription_request_pick">Выберите подписку</string>
     <string name="random_local_port">Случайный локальный порт</string>
-    <string name="local_proxy_port">Локальный SOCKS-порт (1024-65535)</string>
+    <string name="local_proxy_port">Локальный SOCKS-порт (от 1024 до 65535)</string>
     <string name="local_port_reconnect">Применяется при следующем подключении VPN. Отключите случайный выбор, чтобы использовать указанный порт.</string>
     <string name="error_naive_original_core">Это ядро Xray не поддерживает NaiveProxy. Выберите другой сервер.</string>
 </resources>
