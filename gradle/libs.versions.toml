@@ -1,19 +1,19 @@
 [versions]
-agp = "9.5.1"
+agp = "9.5.3"
 kotlin = "2.4.21"
 ksp = "2.3.12"
 compileSdk = "37"
 targetSdk = "37"
 minSdk = "26"
-compose = "1.12.1"
-material3 = "1.5.0-rc01"
+compose = "1.13.0"
+material3 = "1.5.0"
 activity = "1.13.0"
-lifecycle = "2.11.0"
+lifecycle = "2.11.1"
 coreKtx = "1.19.1"
 room = "2.8.5"
 work = "2.12.0"
 serialization = "1.13.0"
-camera = "1.6.2"
+camera = "1.7.0"
 
 [libraries]
 androidx-exifinterface = "androidx.exifinterface:exifinterface:1.4.2"
@@ -44,7 +44,7 @@ androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", versi
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camera" }
 jsr305 = "com.google.code.findbugs:jsr305:3.0.2"
 junit = "junit:junit:4.13.2"
-robolectric = "org.robolectric:robolectric:4.18"
+robolectric = "org.robolectric:robolectric:4.18.1"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
