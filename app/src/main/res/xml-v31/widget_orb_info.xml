@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The orb's own provider card: 2×2 out of the picker's tray, resizing any way the
+    launcher allows — the renderer and the touch zones both live off proportions, so a
+    bigger orb is a redraw, not a relayout. No polling: the state broadcast and the
+    host's own update moments are the whole refresh schedule.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_orb"
+    android:previewLayout="@layout/widget_orb"
+    android:description="@string/widget_description" />
