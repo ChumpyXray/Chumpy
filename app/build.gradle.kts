@@ -13,7 +13,11 @@ plugins {
 
 android {
     namespace = "slop.miho.chumpy"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk {
+        version = release(libs.versions.compileSdk.get().toInt()) {
+            minorApiLevel = libs.versions.compileSdkMinor.get().toInt()
+        }
+    }
 
     // The build's own number: every invocation that assembles a release APK takes the
     // next one (debug-only and test runs hold it, so a delivery's debug build carries the
