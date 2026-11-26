@@ -1110,6 +1110,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 awaitClose { connectivity.unregisterNetworkCallback(callback) }
             }.distinctUntilChanged().drop(1).collect { network ->
+                Log.i("Chumpy/Ping", "Underlying network changed; available=${network != null}")
                 pingNetworkLost = network == null
                 cancelServerSweep()
                 individualPings.values.toList().forEach { it.cancel() }
@@ -1188,6 +1189,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     REGULAR_PING_CONCURRENCY
                 }
+                Log.i("Chumpy/Ping", "Sweep $generation started: automatic=$automatic, targets=${targets.size}, probes=${profiles.size}, parallelism=$parallelism")
                 val largeList = parallelism > REGULAR_PING_CONCURRENCY
                 val queue = if (automatic) profiles else withContext(Dispatchers.Default) {
                     profiles.sortedBy { profile ->
@@ -1247,8 +1249,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
+                Log.e("Chumpy/Ping", "Sweep $generation failed", e)
                 if (generation == sweepGeneration) _servers.update { it.copy(error = e.message ?: app.getString(R.string.error_unknown)) }
             } finally {
+                Log.i("Chumpy/Ping", "Sweep $generation finished")
                 if (generation == sweepGeneration) {
                     sweepTargetProfileId = null
                     _servers.update { s ->
