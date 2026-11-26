@@ -470,6 +470,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val configurationMutex = Mutex()
     private var sweepJob: Job? = null
     private var sweepGeneration = 0L
+    private val automaticallyCheckedProfiles = mutableSetOf<String>()
 
     /** The targeted sweep's single row, when the sweep is one balancer's own ask. */
     private var sweepTargetProfileId: String? = null
@@ -656,7 +657,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             selectedProfileId = visible.firstOrNull { it.id == connection.value.selectedProfileId }?.id
                                 ?: visible.firstOrNull()?.id)
                     }
-                    if (visible.any { it.lastTestAt == null }) {
+                    if (visible.any { it.needsAutomaticPing() }) {
                         startServerSweep(true)
                     }
                 }
@@ -1112,7 +1113,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 pingNetworkLost = network == null
                 cancelServerSweep()
                 individualPings.values.toList().forEach { it.cancel() }
-                if (!pingNetworkLost) startServerSweep(onlyUntested = false)
+                if (!pingNetworkLost) startServerSweep(automatic = false)
             }
         }
     }
@@ -1123,7 +1124,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * every profile's chip answers with its own number — or a dash, when the server is
      * unreachable.
      */
-    fun pingServers() = startServerSweep(onlyUntested = false)
+    fun pingServers() = startServerSweep(automatic = false)
 
     private fun cancelServerSweep() {
         sweepGeneration++
@@ -1140,12 +1141,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun startServerSweep(onlyUntested: Boolean, targetProfileId: String? = null) {
-        if (pingNetworkLost || (onlyUntested && sweepJob?.isActive == true)) return
+    private fun ProfileEntity.needsAutomaticPing(): Boolean =
+        id !in automaticallyCheckedProfiles && (lastTestAt == null || (testDelayMillis ?: -1L) < 0L)
+
+    private fun startServerSweep(automatic: Boolean, targetProfileId: String? = null) {
+        if (pingNetworkLost || (automatic && sweepJob?.isActive == true)) return
         val targets = _servers.value.profiles.filter {
-            (targetProfileId == null || it.id == targetProfileId) && (!onlyUntested || it.lastTestAt == null)
+            (targetProfileId == null || it.id == targetProfileId) && (!automatic || it.needsAutomaticPing())
         }
         if (targets.isEmpty()) return
+        // Record attempts before Room emits results, so failed probes cannot restart themselves.
+        automaticallyCheckedProfiles.addAll(targets.map { it.id })
         val subscriptionId = selectedSubscriptionId.value?.takeUnless { it == STANDALONE_SUBSCRIPTION_ID }
         val generation = ++sweepGeneration
         sweepJob?.cancel()
@@ -1183,7 +1189,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     REGULAR_PING_CONCURRENCY
                 }
                 val largeList = parallelism > REGULAR_PING_CONCURRENCY
-                val queue = if (onlyUntested) profiles else withContext(Dispatchers.Default) {
+                val queue = if (automatic) profiles else withContext(Dispatchers.Default) {
                     profiles.sortedBy { profile ->
                         when {
                             (profile.testDelayMillis ?: -1) >= 0 -> 0
@@ -1273,7 +1279,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val profile = _servers.value.profiles.firstOrNull { it.id == id } ?: return
         if (pingNetworkLost) return
         if (profile.type == ProfileType.BALANCER) {
-            startServerSweep(onlyUntested = false, targetProfileId = id)
+            startServerSweep(automatic = false, targetProfileId = id)
             return
         }
         individualPings[id]?.cancel()
