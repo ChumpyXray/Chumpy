@@ -1150,8 +1150,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             (targetProfileId == null || it.id == targetProfileId) && (!automatic || it.needsAutomaticPing())
         }
         if (targets.isEmpty()) return
-        // Record attempts before Room emits results, so failed probes cannot restart themselves.
-        automaticallyCheckedProfiles.addAll(targets.map { it.id })
         val subscriptionId = selectedSubscriptionId.value?.takeUnless { it == STANDALONE_SUBSCRIPTION_ID }
         val generation = ++sweepGeneration
         sweepJob?.cancel()
@@ -1205,6 +1203,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val publishedBalancers = mutableSetOf<String>()
                         val emptyBalancers = balancers.filterValues { it.isEmpty() }.keys
                         if (emptyBalancers.isNotEmpty()) {
+                            automaticallyCheckedProfiles.addAll(emptyBalancers.map { it.id })
                             repository.setProfileDelays(emptyBalancers.map { it.id to null }, System.currentTimeMillis())
                             publishedBalancers.addAll(emptyBalancers.map { it.id })
                         }
@@ -1221,6 +1220,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 batch.add(balancer.id to best)
                                 publishedBalancers.add(balancer.id)
                             }
+                            // Mark completed probes before Room emits, without consuming cancelled queue entries.
+                            automaticallyCheckedProfiles.addAll(batch.map { it.first })
                             repository.setProfileDelays(batch, System.currentTimeMillis())
                         }
                     }
@@ -1255,6 +1256,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             pingingIds = if (targetProfileId == null) s.pingingIds else s.pingingIds - targetProfileId,
                         )
                     }
+                    sweepJob = null
+                    // The user may have selected another subscription while this queue was running.
+                    startServerSweep(automatic = true)
                 }
             }
         }
@@ -1291,6 +1295,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val delay = regularPingSemaphore.withPermit {
                     measureServerDelay(profile, connection.value.delayTestUrl)
                 }
+                automaticallyCheckedProfiles.add(id)
                 repository.setProfileDelay(id, delay, System.currentTimeMillis())
             } finally {
                 if (individualPings[id] == currentCoroutineContext()[Job]) {
