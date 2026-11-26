@@ -816,6 +816,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val resolvedProfile = repository.profileById(profile.id)
                         ?: throw IllegalStateException("Selected server no longer exists")
+                    require(resolvedProfile.type != ProfileType.NAIVE) { app.getString(R.string.error_naive_original_core) }
                     require(!resolvedProfile.hidden && !resolvedProfile.concealed) { "Selected server is hidden" }
                     // A balancer's members are resolved against the store, not the screen's
                     // list — the screen hides the members, the store keeps them: linkKeys from

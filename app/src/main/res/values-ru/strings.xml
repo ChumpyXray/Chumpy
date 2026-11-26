@@ -221,7 +221,7 @@
         <item quantity="many">Автообновление %d подписок</item>
         <item quantity="other">Автообновление %d подписки</item>
     </plurals>
-    <string name="settings_about_core">Ядро</string>
+    <string name="settings_about_core">Ядро Xray</string>
     <string name="settings_about_core_running">работает</string>
     <string name="settings_about_core_not_running">остановлено</string>
     <string name="settings_about_version">Версия</string>
@@ -415,4 +415,5 @@
     <string name="random_local_port">Случайный локальный порт</string>
     <string name="local_proxy_port">Локальный SOCKS-порт (1024-65535)</string>
     <string name="local_port_reconnect">Применяется при следующем подключении VPN. Отключите случайный выбор, чтобы использовать указанный порт.</string>
+    <string name="error_naive_original_core">Это ядро Xray не поддерживает NaiveProxy. Выберите другой сервер.</string>
 </resources>

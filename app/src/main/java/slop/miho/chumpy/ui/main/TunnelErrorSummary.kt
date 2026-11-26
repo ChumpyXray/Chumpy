@@ -13,6 +13,7 @@ internal fun tunnelErrorSummary(rawError: String): Int {
         has("geodata", "базу маршрутизации", "geosite.dat", "geoip.dat", "failed to load geosite", "failed to load geoip",
             "failed to load geo site", "failed to load geo ip", "failed to check code") ->
             R.string.tunnel_error_geodata
+        has("naiveproxy is not supported", "naiveproxy не поддерживается") -> R.string.error_naive_original_core
         has("unknown transport protocol", "unknown protocol", "unknown config id",
             "unsupported cipher method", "unknown cipher method") ->
             R.string.tunnel_error_protocol

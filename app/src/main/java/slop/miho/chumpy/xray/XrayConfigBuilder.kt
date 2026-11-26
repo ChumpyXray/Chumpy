@@ -92,7 +92,7 @@ object XrayConfigBuilder {
         require(profile.type != ProfileType.BALANCER || members.isNotEmpty()) { "Balancer has no usable servers" }
         val balancerMembers = if (profile.type == ProfileType.BALANCER) members else emptyList()
         val strategy = profile.balancerStrategy.ifEmpty { "random" }
-        val isNaive = profile.type == ProfileType.NAIVE
+        require(profile.type != ProfileType.NAIVE) { "NaiveProxy is not supported by this Xray core" }
         val config = buildJsonObject {
             put("stats", buildJsonObject {})
             put("log", buildJsonObject {
@@ -166,7 +166,7 @@ object XrayConfigBuilder {
             "outbounds",
             buildJsonArray {
                 if (balancerMembers.isEmpty()) {
-                    if (!isNaive) add(OutboundBuilder.build(profile, PROXY_TAG))
+                    add(OutboundBuilder.build(profile, PROXY_TAG))
                 } else {
                     balancerMembers.forEachIndexed { index, member ->
                         add(OutboundBuilder.build(member, memberTag(index)))
@@ -235,7 +235,7 @@ object XrayConfigBuilder {
             },
         )
         }
-        return if (isNaive) NaiveTunnelConfig.attach(config, profile) else config.toString()
+        return config.toString()
     }
 
     /**
@@ -243,7 +243,7 @@ object XrayConfigBuilder {
      * outbound, no inbounds — the measurement core dials the test URL through it.
      */
     fun buildTest(profile: ProfileEntity): String {
-        if (profile.type == ProfileType.NAIVE) return NaiveTunnelConfig.buildProbe(profile)
+        require(profile.type != ProfileType.NAIVE) { "NaiveProxy is not supported by this Xray core" }
         return buildJsonObject {
         put("log", buildJsonObject { put("loglevel", "warning") })
         put("inbounds", buildJsonArray {})

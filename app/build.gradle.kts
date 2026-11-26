@@ -138,7 +138,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(files(providers.gradleProperty("cuCoreAar").orElse("libs/cucore.aar").get()))
+    implementation(files("libs/libv2ray.aar"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.exifinterface)
