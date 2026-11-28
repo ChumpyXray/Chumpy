@@ -806,6 +806,7 @@ private fun ShellDestinationPage(
                     onTogglePinned = onTogglePinned,
                     onToggleSubscriptionPinned = onToggleSubscriptionPinned,
                     onToggleConcealed = onToggleConcealed,
+                    onToggleAutoUpdate = onToggleAutoUpdate,
                     onSelect = onSelect,
                     onSortServers = onSortServers,
                 )
@@ -830,12 +831,10 @@ private fun ShellDestinationPage(
             )
             SettingsCategory.CONNECTION -> ConnectionScreen(
                 connection = connection,
-                subscriptions = subscriptions,
                 flagStyle = uiSettings.flagStyle,
                 settings = uiSettings,
                 onChangeConnection = onChangeConnection,
                 onChangeSettings = onUiSettingsChange,
-                onToggleAutoUpdate = onToggleAutoUpdate,
             )
             SettingsCategory.ABOUT -> AboutScreen(
                 coreVersion = coreVersion,

@@ -79,6 +79,8 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import slop.miho.chumpy.ui.components.SettingsGroup
+import slop.miho.chumpy.ui.components.ToggleRow
 import slop.miho.chumpy.ui.components.focusRing
 import slop.miho.chumpy.R
 import slop.miho.chumpy.data.ConnectionStore
@@ -311,24 +313,42 @@ private fun AppsPage(
             listState = listState,
             pullShift = pullShift,
             toggle = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MasterSwitchRow(
-                        title = stringResource(R.string.per_app_title),
-                        supporting = when {
-                            !enabled -> stringResource(R.string.per_app_disabled)
-                            onlyMode -> pluralStringResource(R.plurals.per_app_only_count, bypassed.size, bypassed.size)
-                            bypassed.isEmpty() -> stringResource(R.string.per_app_hint)
-                            else -> pluralStringResource(R.plurals.per_app_count, bypassed.size, bypassed.size)
-                        },
-                        enabled = enabled,
-                        onChange = onToggleEnabled,
-                    )
-                    slop.miho.chumpy.ui.components.PreferenceChoices(
-                        labels = listOf(stringResource(R.string.per_app_bypass_mode), stringResource(R.string.per_app_only_mode)),
-                        selected = if (onlyMode) 1 else 0,
-                        onSelect = { onOnlyModeChange(it == 1) },
-                    )
-                }
+                // The master's card and the mode's row in one group: the 2dp seam ties
+                // them, the mode asleep while the whole list is off.
+                SettingsGroup(
+                    {
+                        MasterSwitchRow(
+                            title = stringResource(R.string.per_app_title),
+                            supporting = when {
+                                !enabled -> stringResource(R.string.per_app_disabled)
+                                onlyMode -> pluralStringResource(R.plurals.per_app_only_count, bypassed.size, bypassed.size)
+                                bypassed.isEmpty() -> stringResource(R.string.per_app_hint)
+                                else -> pluralStringResource(R.plurals.per_app_count, bypassed.size, bypassed.size)
+                            },
+                            enabled = enabled,
+                            onChange = onToggleEnabled,
+                        )
+                    },
+                    {
+                        // The mode, one whole-row button: the current mode's name on top,
+                        // what it does to the picked apps spelled out under it, the tap
+                        // trading the row to the other mode. The tile's mark is steady —
+                        // the alternate-directions signpost stands for both modes.
+                        ToggleRow(
+                            title = stringResource(
+                                if (onlyMode) R.string.per_app_only_mode else R.string.per_app_bypass_mode,
+                            ),
+                            supporting = stringResource(
+                                if (onlyMode) R.string.per_app_only_mode_hint else R.string.per_app_bypass_mode_hint,
+                            ),
+                            icon = R.drawable.ic_directions_alt,
+                            checked = onlyMode,
+                            onChange = onOnlyModeChange,
+                            enabled = enabled,
+                            leadingTile = true,
+                        )
+                    },
+                )
             },
         ) {
             item(key = "app search") {
@@ -453,28 +473,22 @@ private fun MasterSwitchRow(
     // Bumped in the click handler: the tile's pop keys off it, so it fires on every
     // click — the press state alone can go unnoticed on a quick tap.
     var taps by remember { mutableIntStateOf(0) }
-    Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        color = colors.surfaceContainer.copy(alpha = LocalSurfaceOpacity.current),
-        contentColor = colors.onSurface,
-        modifier = Modifier.fillMaxWidth(),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRing(inset = true, gap = 1.dp)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+            ) {
+                poke()
+                taps++
+                onChange(!enabled)
+            }
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRing(inset = true, gap = 1.dp)
-                .combinedClickable(
-                    interactionSource = interactionSource,
-                    indication = LocalIndication.current,
-                ) {
-                    poke()
-                    taps++
-                    onChange(!enabled)
-                }
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
             // The toggle tile, leading: the accent while the list applies, the
             // crossfading mark in the middle.
             val toggleResting = if (enabled) colors.primary else colors.secondaryContainer
@@ -527,7 +541,6 @@ private fun MasterSwitchRow(
                 )
             }
         }
-    }
 }
 
 /**

@@ -212,6 +212,7 @@ fun ServersScreen(
     onTogglePinned: (String, Boolean) -> Unit,
     onToggleSubscriptionPinned: (String, Boolean) -> Unit,
     onToggleConcealed: (String, Boolean) -> Unit,
+    onToggleAutoUpdate: (String, Boolean) -> Unit,
     onSelect: (String) -> Unit,
     onSortServers: (ServersSort) -> Unit,
 ) {
@@ -421,6 +422,7 @@ fun ServersScreen(
                                     },
                                     onDeleteRequest = { onDeleteSubscription(it.id) },
                                     onTogglePinned = onToggleSubscriptionPinned,
+                                    onToggleAutoUpdate = onToggleAutoUpdate,
                                     menuHost = menuHost,
                                     onMenuHostChange = { openMenu(it) },
                                     menuAskingDelete = menuAskingDelete,
@@ -1363,6 +1365,7 @@ private fun SubscriptionDropdown(
     onSelect: (String) -> Unit,
     onDeleteRequest: (SubscriptionEntity) -> Unit,
     onTogglePinned: (String, Boolean) -> Unit,
+    onToggleAutoUpdate: (String, Boolean) -> Unit,
     menuHost: String?,
     onMenuHostChange: (String?) -> Unit,
     menuAskingDelete: Boolean,
@@ -1374,6 +1377,7 @@ private fun SubscriptionDropdown(
     val outer = MaterialTheme.shapes.extraLarge
     val inner = MaterialTheme.shapes.extraSmall
     val density = LocalDensity.current
+    val context = LocalContext.current
     // The standalone group leads the list whenever it has something in it — the cards
     // stack's own row, first above the panels' own — and stays gone entirely while it
     // doesn't, so the list never advertises an empty pocket.
@@ -1475,6 +1479,24 @@ private fun SubscriptionDropdown(
                         onDelete = { onDeleteRequest(subscription) },
                         pinned = subscription.pinned,
                         onTogglePinned = { onTogglePinned(subscription.id, it) },
+                        // The subscription's own schedule: the toggle flips it right
+                        // from the menu, the check on the right says it runs.
+                        canBackgroundRefresh = true,
+                        backgroundRefreshOn = subscription.autoUpdate,
+                        onToggleBackgroundRefresh = { onToggleAutoUpdate(subscription.id, it) },
+                        // The request and HWID settings' own screen — its check says
+                        // a custom HWID stands, replacing the global fingerprint's.
+                        canRequestSettings = true,
+                        hasCustomHwid = subscription.requestHwid != null,
+                        onOpenRequestSettings = {
+                            context.startActivity(
+                                Intent(context, slop.miho.chumpy.ui.request.SubscriptionRequestActivity::class.java)
+                                    .putExtra(
+                                        slop.miho.chumpy.ui.request.SubscriptionRequestActivity.EXTRA_ID,
+                                        subscription.id,
+                                    ),
+                            )
+                        },
                     )
                 },
                 dimmed = menuHost != null && menuHost != subscription.id,
@@ -1964,6 +1986,12 @@ private fun SubscriptionRow(
                 onDelete = rowMenu.onDelete,
                 pinned = rowMenu.pinned,
                 onTogglePinned = rowMenu.onTogglePinned,
+                canBackgroundRefresh = rowMenu.canBackgroundRefresh,
+                backgroundRefreshOn = rowMenu.backgroundRefreshOn,
+                onToggleBackgroundRefresh = rowMenu.onToggleBackgroundRefresh,
+                canRequestSettings = rowMenu.canRequestSettings,
+                hasCustomHwid = rowMenu.hasCustomHwid,
+                onOpenRequestSettings = rowMenu.onOpenRequestSettings,
             )
         }
     }
@@ -2719,6 +2747,12 @@ private fun ServerRow(
                 onToggleConcealed = rowMenu.onToggleConcealed,
                 canPing = rowMenu.canPing,
                 onPing = rowMenu.onPing,
+                canBackgroundRefresh = rowMenu.canBackgroundRefresh,
+                backgroundRefreshOn = rowMenu.backgroundRefreshOn,
+                onToggleBackgroundRefresh = rowMenu.onToggleBackgroundRefresh,
+                canRequestSettings = rowMenu.canRequestSettings,
+                hasCustomHwid = rowMenu.hasCustomHwid,
+                onOpenRequestSettings = rowMenu.onOpenRequestSettings,
             )
         }
         // The pin's mark: a pinned row wears the pin itself, stuck through the card's
@@ -2807,6 +2841,15 @@ private class RowMenu(
     /** The ping's own door — the row's one way to ask for a fresh number. */
     val canPing: Boolean = false,
     val onPing: () -> Unit = {},
+    /** The background refresh's own door: flips the subscription's schedule from the
+     *  menu, and [backgroundRefreshOn] wears the check on the door's right. */
+    val canBackgroundRefresh: Boolean = false,
+    val backgroundRefreshOn: Boolean = false,
+    val onToggleBackgroundRefresh: (Boolean) -> Unit = {},
+    /** The request and HWID settings' own door: [hasCustomHwid] wears the check. */
+    val canRequestSettings: Boolean = false,
+    val hasCustomHwid: Boolean = false,
+    val onOpenRequestSettings: () -> Unit = {},
 )
 
 /**
@@ -2839,6 +2882,12 @@ private fun CardActionsMenu(
     onToggleConcealed: (Boolean) -> Unit = {},
     canPing: Boolean = false,
     onPing: () -> Unit = {},
+    canBackgroundRefresh: Boolean = false,
+    backgroundRefreshOn: Boolean = false,
+    onToggleBackgroundRefresh: (Boolean) -> Unit = {},
+    canRequestSettings: Boolean = false,
+    hasCustomHwid: Boolean = false,
+    onOpenRequestSettings: () -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
@@ -2956,6 +3005,46 @@ private fun CardActionsMenu(
                                     painterResource(R.drawable.ic_content_copy),
                                     contentDescription = null,
                                 )
+                            },
+                        )
+                    }
+                    // The subscription's own schedule, flipped right from the menu:
+                    // while it runs, the door wears the check on the right.
+                    if (canBackgroundRefresh) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_background_refresh)) },
+                            onClick = {
+                                onClose()
+                                poke()
+                                onToggleBackgroundRefresh(!backgroundRefreshOn)
+                            },
+                            leadingIcon = {
+                                Icon(painterResource(R.drawable.ic_clock), contentDescription = null)
+                            },
+                            trailingIcon = {
+                                if (backgroundRefreshOn) {
+                                    Icon(painterResource(R.drawable.ic_check), contentDescription = null)
+                                }
+                            },
+                        )
+                    }
+                    // The request and HWID settings' own screen; a custom HWID set
+                    // there shows the check on the door's right.
+                    if (canRequestSettings) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.subscription_request_settings)) },
+                            onClick = {
+                                onClose()
+                                poke()
+                                onOpenRequestSettings()
+                            },
+                            leadingIcon = {
+                                Icon(painterResource(R.drawable.ic_tune), contentDescription = null)
+                            },
+                            trailingIcon = {
+                                if (hasCustomHwid) {
+                                    Icon(painterResource(R.drawable.ic_check), contentDescription = null)
+                                }
                             },
                         )
                     }

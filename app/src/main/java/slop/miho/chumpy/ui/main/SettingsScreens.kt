@@ -96,6 +96,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import slop.miho.chumpy.Graph
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -128,6 +129,12 @@ import slop.miho.chumpy.data.ThemeMode
 import slop.miho.chumpy.data.UiSettings
 import slop.miho.chumpy.ui.components.FlipTriangleTile
 import slop.miho.chumpy.ui.components.FoldingGroup
+import slop.miho.chumpy.ui.components.HappFieldRow
+import slop.miho.chumpy.ui.components.IconChoice
+import slop.miho.chumpy.ui.components.IconChoiceRow
+import slop.miho.chumpy.ui.components.SettingsGroup
+import slop.miho.chumpy.ui.components.SwatchDivider
+import slop.miho.chumpy.ui.components.ToggleRow
 import slop.miho.chumpy.ui.components.InfoChip
 import slop.miho.chumpy.ui.components.UpdateCard
 import slop.miho.chumpy.ui.components.InputMode
@@ -432,81 +439,6 @@ fun InterfaceScreen(
     }
 }
 
-/**
- * A rounded tonal container of setting rows: extra-large outer corners, extra-small inner
- * corners and a 2dp gap between rows instead of dividers (the MD3 grouped-list pattern the
- * server list also uses).
- *
- * [isVisible] folds rows (past the first) in and out by index. The gap travels with its row,
- * so a folding row takes its gap along; and the group's own clip keeps the outer rounding on
- * whichever row ends up last.
- */
-@Composable
-private fun SettingsGroup(
-    vararg rows: @Composable () -> Unit,
-    isVisible: (Int) -> Boolean = { true },
-) {
-    val outer = MaterialTheme.shapes.extraLarge
-    val inner = MaterialTheme.shapes.extraSmall
-    val motion = MaterialTheme.motionScheme
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(outer),
-    ) {
-        rows.forEachIndexed { index, row ->
-            val surface: @Composable () -> Unit = {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainer.withSurfaceOpacity(),
-                    shape = RoundedCornerShape(
-                        topStart = if (index == 0) outer.topStart else inner.topStart,
-                        topEnd = if (index == 0) outer.topEnd else inner.topEnd,
-                        bottomStart = if (index == rows.lastIndex) outer.bottomStart else inner.bottomStart,
-                        bottomEnd = if (index == rows.lastIndex) outer.bottomEnd else inner.bottomEnd,
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    row()
-                }
-            }
-            if (index == 0) {
-                surface()
-            } else {
-                AnimatedVisibility(
-                    visible = isVisible(index),
-                    enter = expandVertically(motion.defaultSpatialSpec()) +
-                        fadeIn(motion.defaultEffectsSpec()),
-                    exit = shrinkVertically(motion.defaultSpatialSpec()) +
-                        fadeOut(motion.defaultEffectsSpec()),
-                ) {
-                    Column(Modifier.padding(top = 2.dp)) {
-                        surface()
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * One option of an [IconChoiceRow]: its label (read out, never shown), its value, and the
- * 24dp art drawn in its tile — a plain drawable icon, or anything else (the flag previews).
- * [onLongClick] is an optional hidden action on the long tap.
- */
-private class IconChoice<T>(
-    val label: Int,
-    val value: T,
-    val onLongClick: (() -> Unit)? = null,
-    val content: @Composable () -> Unit,
-) {
-    constructor(@DrawableRes icon: Int, label: Int, value: T, onLongClick: (() -> Unit)? = null) : this(
-        label,
-        value,
-        onLongClick,
-        { Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
-    )
-}
-
 /** The country the flag style tiles preview their look with. */
 private const val FLAG_PREVIEW_COUNTRY = "JP"
 
@@ -518,253 +450,6 @@ private fun PreviewFlag(rainbow: Boolean, twemoji: Boolean) {
             RainbowFlag(twemoji)
         } else {
             CountryFlag(code = FLAG_PREVIEW_COUNTRY, twemoji = twemoji)
-        }
-    }
-}
-
-/**
- * A setting with a few mutually exclusive options, picked with square icon buttons.
- * [showSelectedLabel] names the picked option under the title, as the font row does.
- */
-@Composable
-private fun <T> IconChoiceRow(
-    title: String,
-    options: List<IconChoice<T>>,
-    selected: T,
-    onSelect: (T) -> Unit,
-    showSelectedLabel: Boolean = false,
-) {
-    // Same content padding as the accent row below: one unified 16dp from the group edge
-    // to the controls in both rows, and 12dp between the buttons.
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (showSelectedLabel) {
-                options.firstOrNull { it.value == selected }?.let { option ->
-                    Text(
-                        text = stringResource(option.label),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-        Row(
-            modifier = Modifier.padding(start = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            options.forEach { option ->
-                SquareIconButton(
-                    label = stringResource(option.label),
-                    selected = option.value == selected,
-                    onClick = { onSelect(option.value) },
-                    onLongClick = option.onLongClick,
-                    content = option.content,
-                )
-            }
-        }
-    }
-}
-
-/**
- * A square icon toggle: raised tonal container by default, the accent container while
- * selected, with the usual springy color swap. Pressing squashes it down a touch and dips
- * the container tone (a 10% on-surface state layer); every click bounces it back with a
- * pop, so a quick tap reads as clearly as a held one.
- */
-@Composable
-private fun SquareIconButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-    content: @Composable () -> Unit,
-) {
-    val colors = MaterialTheme.colorScheme
-    val motion = MaterialTheme.motionScheme
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val poke = rememberHapticPoke()
-    // Bumped in the click handler: the pop keys off it, so it fires on every click — the
-    // press state alone can go unnoticed on a quick tap.
-    var taps by remember { mutableIntStateOf(0) }
-    val resting = (if (selected) colors.primary else colors.secondaryContainer)
-    val container by animateColorAsState(
-        targetValue = if (pressed) lerp(resting, colors.onSurface, 0.1f) else resting,
-        animationSpec = motion.defaultEffectsSpec(),
-        label = "icon button container",
-    )
-    val content by animateColorAsState(
-        targetValue = if (selected) colors.onPrimary else colors.onSecondaryContainer,
-        animationSpec = motion.defaultEffectsSpec(),
-        label = "icon button content",
-    )
-    // A plain surface with the click on its modifier: Surface's own onClick has no long tap.
-    val shape = RoundedCornerShape(16.dp)
-    Surface(
-        shape = shape,
-        color = container,
-        contentColor = content,
-        modifier = Modifier
-            .size(48.dp)
-            .pressBounce(pressed, taps)
-            // The controller's ring rides before the clip — outside it, as every ring
-            // sits outside what it marks — the 16dp corners matching the tile's own.
-            .focusRing()
-            .clip(shape)
-            .controllerContextMenu(onLongClick)
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current,
-                role = Role.Button,
-                onLongClick = onLongClick?.let { action ->
-                    {
-                        poke()
-                        taps++
-                        action()
-                    }
-                },
-            ) {
-                poke()
-                taps++
-                onClick()
-            }
-            .semantics { contentDescription = label },
-    ) {
-        Box(contentAlignment = Alignment.Center) { content() }
-    }
-}
-
-/**
- * A boolean setting. The whole row is the touch target, like the server list buttons; the
- * state shows as a square icon tile instead of a switch: tonal while off, accent while on,
- * with the icon swapping to match the state. Laid out by hand rather than via ListItem:
- * ListItem's own vertical geometry shifts with the line count (the tile rides at 8dp on
- * two-line rows and top-aligns on wrapped ones), while here every square button sits at the
- * same 16dp from the card edges as the pickers above.
- */
-@Composable
-private fun ToggleRow(
-    title: String,
-    supporting: String?,
-    icon: Int,
-    checked: Boolean,
-    onChange: (Boolean) -> Unit,
-    onLongClick: (() -> Unit)? = null,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val poke = rememberHapticPoke()
-    // Bumped in the click handler: the tile's pop keys off it, so it fires on every click —
-    // the press state alone can go unnoticed on a quick tap.
-    var taps by remember { mutableIntStateOf(0) }
-    // The controller's eye on the row: the whole row carries the focus, and its tile —
-    // the switch's own stand-in — wears the ring for it.
-    var rowFocused by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .onFocusChanged { rowFocused = it.isFocused }
-            .controllerContextMenu(onLongClick)
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current,
-                onLongClick = onLongClick?.let { action ->
-                    {
-                        poke()
-                        action()
-                    }
-                },
-            ) {
-                poke()
-                taps++
-                onChange(!checked)
-            }
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            supporting?.let { hint ->
-                Text(
-                    text = hint,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        ToggleIconTile(
-            icon = icon,
-            checked = checked,
-            pressed = pressed,
-            taps = taps,
-            focused = { rowFocused },
-        )
-    }
-}
-
-/** The square icon tile that replaces a switch: raised tonal container while off, the
- *  accent container while on, and a crossfading icon in the middle. While the row is held
- *  down the tile squashes and dips its tone, and every click bounces it with a pop. The
- *  row carries the focus, never the tile — [focused] lends it the row's own, so the ring
- *  lands on the row's trailing mark. */
-@Composable
-private fun ToggleIconTile(
-    icon: Int,
-    checked: Boolean,
-    pressed: Boolean,
-    taps: Int,
-    focused: (() -> Boolean)? = null,
-) {
-    val colors = MaterialTheme.colorScheme
-    val motion = MaterialTheme.motionScheme
-    val resting = (if (checked) colors.primary else colors.secondaryContainer)
-    val container by animateColorAsState(
-        targetValue = if (pressed) lerp(resting, colors.onSurface, 0.1f) else resting,
-        animationSpec = motion.defaultEffectsSpec(),
-        label = "toggle tile container",
-    )
-    val content by animateColorAsState(
-        targetValue = if (checked) colors.onPrimary else colors.onSecondaryContainer,
-        animationSpec = motion.defaultEffectsSpec(),
-        label = "toggle tile content",
-    )
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = container,
-        contentColor = content,
-        modifier = Modifier
-            .size(48.dp)
-            .pressBounce(pressed, taps)
-            .focusRing(focused = focused),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Crossfade(
-                targetState = icon,
-                animationSpec = motion.defaultEffectsSpec(),
-                label = "toggle tile icon",
-            ) { res ->
-                Icon(
-                    painter = painterResource(res),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
         }
     }
 }
@@ -970,79 +655,21 @@ private fun TriangleTile(
 }
 
 /**
- * The background refresh's doorway, the screen-link row's twin: the count under the
- * title, and the triangle — the per-app row's own — pointing down while the fold is
- * closed, flipping over to point up as it opens.
- */
-@Composable
-private fun BackgroundRefreshRow(
-    supporting: String,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    title: String? = null,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val poke = rememberHapticPoke()
-    // Bumped in the click handler: the pop keys off it, so it fires on every click —
-    // the press state alone can go unnoticed on a quick tap.
-    var taps by remember { mutableIntStateOf(0) }
-    // The controller's eye on the row: the whole row carries the focus, and its
-    // triangle — the fold's own handle — wears the ring for it.
-    var rowFocused by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .onFocusChanged { rowFocused = it.isFocused }
-            .clickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current,
-            ) {
-                poke()
-                taps++
-                onToggle()
-            }
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title ?: stringResource(R.string.settings_background_refresh),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = supporting,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // The triangle bounces alone when tapped.
-        Box(
-            modifier = Modifier.pressBounce(pressed, taps),
-        ) {
-            FlipTriangleTile(pressed = pressed, expanded = expanded, focused = { rowFocused })
-        }
-    }
-}
-
-/**
- * The "Connection" settings page. One screen, four blocks: how traffic is routed — the
- * mode's tile, the country's flag on it like the fonts' tiles carry their own glyphs,
- * with the per-app and LAN toggles beside it — the URL the real ping measurements
- * fetch through every server, and the background refresh's fold holding the
- * per-subscription switches. Same grouped-list language as the interface page.
+ * The "Connection" settings page. One screen: how traffic is routed — the mode's tile,
+ * the country's flag on it like the fonts' tiles carry their own glyphs, with the
+ * per-app and LAN toggles beside it — and the URL the real ping measurements fetch
+ * through every server. The per-subscription doors (the background refresh's switch,
+ * the request and HWID settings) live in the server list's own row menus — a
+ * subscription's asks stand on its row, not on this page. Same grouped-list language
+ * as the interface page.
  */
 @Composable
 fun ConnectionScreen(
     connection: slop.miho.chumpy.data.ConnectionSettings,
-    subscriptions: List<slop.miho.chumpy.db.SubscriptionEntity>,
     flagStyle: slop.miho.chumpy.data.FlagStyle,
     settings: slop.miho.chumpy.data.UiSettings,
     onChangeConnection: ((slop.miho.chumpy.data.ConnectionSettings) -> slop.miho.chumpy.data.ConnectionSettings) -> Unit,
     onChangeSettings: ((slop.miho.chumpy.data.UiSettings) -> slop.miho.chumpy.data.UiSettings) -> Unit,
-    onToggleAutoUpdate: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
@@ -1077,29 +704,18 @@ fun ConnectionScreen(
         // the tunnel at all.
         SettingsGroup(
             {
-                if (connection.customRouting.enabled) {
-                    Text(
-                        text = stringResource(R.string.custom_routing_exclusive_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
-                    )
-                } else {
-                    RoutingRow(
-                        selected = connection.routingMode,
-                        flagStyle = flagStyle,
-                        onSelect = { mode -> onChangeConnection { it.copy(routingMode = mode) } },
-                    )
-                }
-            },
-            {
-                ScreenLinkRow(
-                    title = stringResource(R.string.custom_routing_title),
-                    supporting = if (connection.customRouting.enabled) {
-                        pluralStringResource(R.plurals.custom_routing_count, connection.customRouting.entryCount, connection.customRouting.entryCount)
-                    } else stringResource(R.string.custom_routing_off),
-                    icon = R.drawable.ic_tune,
-                    target = slop.miho.chumpy.ui.routing.CustomRoutingActivity::class.java,
+                // The strip rides in every state: the custom rules sit in it as their
+                // own tile instead of banishing the picker.
+                RoutingRow(
+                    selected = connection.routingMode,
+                    selectedProfileId = connection.selectedProfileId,
+                    customRoutingEnabled = connection.customRouting.enabled,
+                    flagStyle = flagStyle,
+                    onSelectMode = { mode ->
+                        onChangeConnection {
+                            it.copy(routingMode = mode, customRouting = it.customRouting.copy(enabled = false))
+                        }
+                    },
                 )
             },
             {
@@ -1323,98 +939,53 @@ fun ConnectionScreen(
                 )
             },
         )
-        if (subscriptions.isNotEmpty()) {
-            // The panel's own schedule, one row per subscription behind a fold: the
-            // doorway counts how many refresh, the switches riding under it inside the
-            // same card — the Happ block's own fold, unrolling with the seam.
-            var refreshOpen by rememberSaveable { mutableStateOf(false) }
-            val autoCount = subscriptions.count { it.autoUpdate }
-            FoldingGroup(
-                expanded = refreshOpen,
-                headerRows = listOf(
-                    {
-                        BackgroundRefreshRow(
-                            supporting = when {
-                                autoCount == 0 -> stringResource(R.string.per_app_disabled)
-                                else -> pluralStringResource(
-                                    R.plurals.settings_background_refresh_count,
-                                    autoCount,
-                                    autoCount,
-                                )
-                            },
-                            expanded = refreshOpen,
-                            onToggle = { refreshOpen = !refreshOpen },
-                        )
-                    }
-                ),
-                rows = subscriptions.map { subscription ->
-                    @Composable {
-                        ToggleRow(
-                            // The addresses' curtain reaches the unnamed subscriptions
-                            // too: no name means the URL would have shown, so the title
-                            // stands empty instead.
-                            title = subscription.name.ifEmpty {
-                                if (LocalUiSettings.current.maskAddresses) "" else subscription.url
-                            },
-                            supporting = null,
-                            icon = R.drawable.ic_clock,
-                            checked = subscription.autoUpdate,
-                            onChange = { enabled ->
-                                onToggleAutoUpdate(subscription.id, enabled)
-                            },
-                        )
-                    }
-                },
-            )
-            SubscriptionRequestPicker(subscriptions)
-        }
+        // The per-subscription doors — the background refresh's switch and the request
+        // and HWID settings — live in the subscription row's own menu on the servers
+        // screen, next to the pin and the delete.
     }
 }
 
-@Composable
-private fun SubscriptionRequestPicker(subscriptions: List<slop.miho.chumpy.db.SubscriptionEntity>) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    FoldingGroup(
-        expanded = expanded,
-        headerRows = listOf({
-            BackgroundRefreshRow(
-                title = stringResource(R.string.subscription_request_settings),
-                supporting = stringResource(R.string.subscription_request_pick),
-                expanded = expanded,
-                onToggle = { expanded = !expanded },
-            )
-        }),
-        rows = subscriptions.map { subscription ->
-            @Composable {
-                ScreenLinkRow(
-                    title = subscription.name.ifBlank { stringResource(R.string.subscription_none) },
-                    supporting = stringResource(R.string.subscription_request_settings),
-                    icon = R.drawable.ic_database,
-                    target = slop.miho.chumpy.ui.request.SubscriptionRequestActivity::class.java,
-                    extra = slop.miho.chumpy.ui.request.SubscriptionRequestActivity.EXTRA_ID to subscription.id,
-                )
-            }
-        },
-    )
-}
-
 /**
- * The routing mode, picked right in its row the way the font is, titleless as the fonts'
- * crowded form. The modes run as one horizontally scrolling strip of tiles: the
- * whole-world mode's block tile first, then the regions — each its own flag (the
- * plain-globe style spells it out in its two letters instead). The selected mode's story
- * runs under the strip: a region tells which one stays out of the tunnel, the
- * whole-world mode routes everything.
+ * The routing strip, picked right in its row the way the font is, titleless as the
+ * fonts' crowded form. The app-level modes lead: the plain everything mode, the
+ * subscription's own rules — the tile sleeps while the selected profile carries none —
+ * and the user's custom rules; a thin divider; then the regions, each its own flag (the
+ * plain-globe style spells it out in its two letters instead). The selected mode's
+ * story runs under the strip: a region tells which one stays out of the tunnel.
  */
 @Composable
 private fun RoutingRow(
     selected: slop.miho.chumpy.xray.RoutingMode,
+    selectedProfileId: String?,
+    customRoutingEnabled: Boolean,
     flagStyle: slop.miho.chumpy.data.FlagStyle,
-    onSelect: (slop.miho.chumpy.xray.RoutingMode) -> Unit,
+    onSelectMode: (slop.miho.chumpy.xray.RoutingMode) -> Unit,
 ) {
-    val hint = regionNameRes(selected)?.let { name ->
-        stringResource(R.string.settings_routing_dont_route, stringResource(name))
-    } ?: stringResource(R.string.settings_routing_global_hint)
+    val context = LocalContext.current
+    // Whether the selected profile carries the panel's own routing. A "follow the
+    // subscription" pick without rules to follow shows as the plain everything mode —
+    // the config builder falls back the same way.
+    var subscriptionAvailable by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedProfileId) {
+        subscriptionAvailable = selectedProfileId?.let {
+            Graph.subscriptions.profileById(it)?.routingRules?.isNotBlank()
+        } == true
+    }
+    val effective = if (selected == slop.miho.chumpy.xray.RoutingMode.GLOBAL && !subscriptionAvailable) {
+        slop.miho.chumpy.xray.RoutingMode.DISABLED
+    } else {
+        selected
+    }
+    val hint = when {
+        customRoutingEnabled -> stringResource(R.string.custom_routing_exclusive_hint)
+        effective == slop.miho.chumpy.xray.RoutingMode.DISABLED ->
+            stringResource(R.string.settings_routing_disabled_hint)
+        effective == slop.miho.chumpy.xray.RoutingMode.GLOBAL ->
+            stringResource(R.string.settings_routing_subscription_hint)
+        else -> regionNameRes(effective)?.let { name ->
+            stringResource(R.string.settings_routing_dont_route, stringResource(name))
+        } ?: ""
+    }
     Column(Modifier.fillMaxWidth()) {
         // The scroll runs the card's full width with the padding inside the scrolled
         // content, as in the font picker: the tiles slide under the card's rounding
@@ -1428,33 +999,68 @@ private fun RoutingRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            slop.miho.chumpy.xray.RoutingMode.entries.forEach { mode ->
+            RoutingTile(
+                label = stringResource(R.string.settings_routing_disabled),
+                selected = !customRoutingEnabled &&
+                    effective == slop.miho.chumpy.xray.RoutingMode.DISABLED,
+                onClick = { onSelectMode(slop.miho.chumpy.xray.RoutingMode.DISABLED) },
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_block),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            RoutingTile(
+                label = stringResource(R.string.settings_routing_subscription),
+                selected = !customRoutingEnabled &&
+                    effective == slop.miho.chumpy.xray.RoutingMode.GLOBAL,
+                onClick = { onSelectMode(slop.miho.chumpy.xray.RoutingMode.GLOBAL) },
+                enabled = subscriptionAvailable,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_directions),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            // The custom rules' tile is a doorway, not a toggle: it leads to their
+            // screen and only wears the accent while the rules are on.
+            RoutingTile(
+                label = stringResource(R.string.custom_routing_title),
+                selected = customRoutingEnabled,
+                onClick = {
+                    context.startActivity(Intent(context, slop.miho.chumpy.ui.routing.CustomRoutingActivity::class.java))
+                },
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_tune),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            // The divider: the app-level modes on one side, the regions' presets on
+            // the other.
+            SwatchDivider()
+            slop.miho.chumpy.xray.RoutingMode.entries.filter { it.region != null }.forEach { mode ->
                 key(mode) {
-                    val region = mode.region
+                    val region = mode.region!!
                     RoutingTile(
                         label = regionNameRes(mode)?.let { name -> stringResource(name) }
-                            ?: stringResource(R.string.settings_routing_global),
-                        selected = selected == mode,
-                        onClick = { onSelect(mode) },
+                            ?: region.uppercase(),
+                        selected = !customRoutingEnabled && effective == mode,
+                        onClick = { onSelectMode(mode) },
                     ) {
-                        if (region == null) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_block),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        } else {
-                            when (flagStyle) {
-                                slop.miho.chumpy.data.FlagStyle.TWEMOJI ->
-                                    CountryFlag(code = region.uppercase(), twemoji = true)
-                                slop.miho.chumpy.data.FlagStyle.SYSTEM ->
-                                    CountryFlag(code = region.uppercase(), twemoji = false)
-                                slop.miho.chumpy.data.FlagStyle.GLOBE ->
-                                    Text(
-                                        text = region.uppercase(),
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                            }
+                        when (flagStyle) {
+                            slop.miho.chumpy.data.FlagStyle.TWEMOJI ->
+                                CountryFlag(code = region.uppercase(), twemoji = true)
+                            slop.miho.chumpy.data.FlagStyle.SYSTEM ->
+                                CountryFlag(code = region.uppercase(), twemoji = false)
+                            slop.miho.chumpy.data.FlagStyle.GLOBE ->
+                                Text(
+                                    text = region.uppercase(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
                         }
                     }
                 }
@@ -1469,7 +1075,7 @@ private fun RoutingRow(
     }
 }
 
-/** The region modes' country names; the whole-world mode has none. */
+/** The region modes' country names; the app-level modes have none. */
 private fun regionNameRes(mode: slop.miho.chumpy.xray.RoutingMode): Int? = when (mode) {
     slop.miho.chumpy.xray.RoutingMode.BYPASS_RU -> R.string.region_ru
     slop.miho.chumpy.xray.RoutingMode.BYPASS_CN -> R.string.region_cn
@@ -1478,6 +1084,7 @@ private fun regionNameRes(mode: slop.miho.chumpy.xray.RoutingMode): Int? = when 
     slop.miho.chumpy.xray.RoutingMode.BYPASS_ID -> R.string.region_id
     slop.miho.chumpy.xray.RoutingMode.BYPASS_TR -> R.string.region_tr
     slop.miho.chumpy.xray.RoutingMode.BYPASS_BR -> R.string.region_br
+    slop.miho.chumpy.xray.RoutingMode.DISABLED -> null
     slop.miho.chumpy.xray.RoutingMode.GLOBAL -> null
 }
 
@@ -1492,6 +1099,7 @@ private fun RoutingTile(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -1517,6 +1125,8 @@ private fun RoutingTile(
         contentColor = tileContent,
         modifier = Modifier
             .size(48.dp)
+            // Asleep, the tile dims — visible, untouchable.
+            .graphicsLayer { alpha = if (enabled) 1f else 0.38f }
             .pressBounce(pressed, taps)
             // The controller's ring rides before the clip — outside it, as every ring
             // sits outside what it marks — the 16dp corners matching the tile's own.
@@ -1526,6 +1136,7 @@ private fun RoutingTile(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 role = Role.Button,
+                enabled = enabled,
             ) {
                 poke()
                 taps++
@@ -1789,99 +1400,6 @@ private fun HappRegenerateRow(
                     painter = painterResource(R.drawable.ic_renew),
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                )
-            }
-        }
-    }
-}
-
-/**
- * One fingerprint field on its own line: a plain row's own two lines — the value where
- * the title goes and the field's name where the supporting goes — only the title line
- * is the editable one, a bare text field with no stadium and no air of its own, so
- * seven of them in a stack read as rows, not as a form. The pencil keeps its place at
- * the end, asleep, marking the row for a text field. Committed on every keystroke;
- * Done commits the trim.
- */
-@Composable
-private fun HappFieldRow(
-    label: String,
-    value: String,
-    onChange: (String) -> Unit,
-) {
-    val colors = MaterialTheme.colorScheme
-    // The same ask as the delay test URL's field: the tap lands before the keyboard
-    // does, so the field re-asks for its visibility once the keys have risen.
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
-    val requester = remember { BringIntoViewRequester() }
-    var focused by remember { mutableStateOf(false) }
-    LaunchedEffect(imeBottom, focused) {
-        if (focused && imeBottom > 0) requester.bringIntoView()
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BasicTextField(
-            value = value,
-            onValueChange = onChange,
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.onSurface),
-            cursorBrush = SolidColor(colors.primary),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = {
-                val trimmedNow = value.trim()
-                if (value != trimmedNow) onChange(trimmedNow)
-            }),
-            decorationBox = { field ->
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    field()
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
-            },
-            modifier = Modifier
-                .weight(1f)
-                .onFocusChanged { focused = it.isFocused }
-                .bringIntoViewRequester(requester)
-                // Under the controller the field sits out of the dpad's walk — the
-                // cursor passing over it must not stop to raise the keyboard. Touch
-                // keeps the field as it always was.
-                .then(
-                    if (LocalInputMode.current == InputMode.CONTROLLER) {
-                        Modifier.focusRing()
-                    } else {
-                        Modifier
-                    },
-                ),
-        )
-        // The pencil, asleep: a pencil, no press, marking the row for a text field.
-        Surface(
-            shape = CircleShape,
-            color = colors.secondaryContainer,
-            contentColor = colors.onSecondaryContainer,
-            modifier = Modifier
-                .size(width = 36.dp, height = 48.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_edit),
-                    contentDescription = null,
-                    // The glyph turns inside the backing — the backing stays put.
-                    // A pencil resting at its writing angle, tip down.
-                    modifier = Modifier
-                        .size(24.dp)
-                        .graphicsLayer { rotationZ = -45f },
                 )
             }
         }

@@ -5,34 +5,49 @@ import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.lifecycle.ViewModel
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +69,9 @@ import slop.miho.chumpy.data.GeodataFiles
 import slop.miho.chumpy.Graph
 import slop.miho.chumpy.ui.components.*
 import slop.miho.chumpy.R
+import slop.miho.chumpy.ui.main.FloatingBottomBarReservedHeight
 import slop.miho.chumpy.ui.theme.ChumpyTheme
+import slop.miho.chumpy.ui.wallpapers.withSurfaceOpacity
 import java.io.File
 
 private enum class CategorySource { GEOSITE, GEOIP }
@@ -97,11 +115,14 @@ class CustomRoutingActivity : ControllerActivity() {
                     CustomRoutingScreen(
                         value = draft.value ?: connection.customRouting,
                         dirty = draft.value != connection.customRouting,
-                        onSave = {
+                        onSaveAndExit = {
                             val saved = draft.value ?: return@CustomRoutingScreen
-                            scope.launch { withContext(Dispatchers.IO) {
-                                ConnectionStore.update(this@CustomRoutingActivity) { it.copy(customRouting = saved) }
-                            } }
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    ConnectionStore.update(this@CustomRoutingActivity) { it.copy(customRouting = saved) }
+                                }
+                                finish()
+                            }
                         },
                         onBack = ::finish,
                         onChange = { value -> draft.value = value },
@@ -113,7 +134,7 @@ class CustomRoutingActivity : ControllerActivity() {
 }
 
 @Composable
-private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: () -> Unit, onBack: () -> Unit, onChange: (CustomRouting) -> Unit) {
+private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSaveAndExit: () -> Unit, onBack: () -> Unit, onChange: (CustomRouting) -> Unit) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
@@ -123,8 +144,14 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
     var loadingSource by remember { mutableStateOf<CategorySource?>(null) }
     var importGeoip by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
+    var noticeError by remember { mutableStateOf(false) }
     var geositeCategories by remember { mutableStateOf(emptyList<String>()) }
     var geoipCategories by remember { mutableStateOf(emptyList<String>()) }
+    // The exit's own doorway: leaving with an unsaved draft asks first, the same card
+    // menu a server's long tap opens. Both back paths — the gesture and the bar's own
+    // button — walk through it.
+    var exitAsk by remember { mutableStateOf(false) }
+    BackHandler(enabled = dirty) { exitAsk = true }
     LaunchedEffect(value.geositeUrl, value.geoipUrl, value.customGeosite, value.customGeoip) {
         geositeCategories = emptyList()
         geoipCategories = emptyList()
@@ -157,6 +184,7 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
         val url = if (source == CategorySource.GEOSITE) value.geositeUrl else value.geoipUrl
         if (url.isBlank()) {
             notice = resources.getString(R.string.custom_routing_https_required)
+            noticeError = true
             return
         }
         downloadPercent = null
@@ -189,9 +217,11 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                 if (url != (if (source == CategorySource.GEOSITE) currentValue.geositeUrl else currentValue.geoipUrl)) return@onSuccess
                 if (source == CategorySource.GEOSITE) geositeCategories = names else geoipCategories = names
                 notice = resources.getQuantityString(R.plurals.custom_routing_loaded_count, names.size, names.size)
+                noticeError = false
             }.onFailure {
                 android.util.Log.e("Chumpy/Routing", "Could not load categories", it)
                 notice = resources.getString(R.string.custom_routing_operation_error)
+                noticeError = true
             }
         }
     }
@@ -233,134 +263,277 @@ private fun CustomRoutingScreen(value: CustomRouting, dirty: Boolean, onSave: ()
                     else currentValue.copy(customGeosite = true, geodataRevision = currentValue.geodataRevision + 1))
                 if (filename == GeodataFiles.USER_GEOIP_FILE) geoipCategories = importedCategories else geositeCategories = importedCategories
                 notice = resources.getQuantityString(R.plurals.custom_routing_imported_count, importedCategories.size, importedCategories.size)
+                noticeError = false
             }.onFailure {
                 android.util.Log.e("Chumpy/Routing", "Could not import geodata", it)
                 notice = resources.getString(R.string.custom_routing_operation_error)
+                noticeError = true
             }
         }
     }
-    PreferenceEditor(R.string.custom_routing_title, onBack) {
-        PreferenceSection {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(slop.miho.chumpy.R.string.custom_routing_enabled), style = MaterialTheme.typography.bodyLarge)
+    // The save's own gatekeeper: HTTPS links without credentials, and the imported
+    // databases actually on the disk before the rules they feed may ride. A failure
+    // stays on the screen as the notice instead of a save.
+    fun validate(): Boolean {
+        val valid = !value.enabled || listOf(value.geositeUrl, value.geoipUrl).all { raw ->
+            raw.isBlank() || raw.trim().toHttpUrlOrNull()?.let {
+                it.isHttps && it.username.isEmpty() && it.password.isEmpty()
+            } == true
+        }
+        val directory = File(context.filesDir, "xray_assets")
+        val importedReady = !value.enabled || listOf(
+            value.customGeosite to GeodataFiles.USER_GEOSITE_FILE,
+            value.customGeoip to GeodataFiles.USER_GEOIP_FILE,
+        ).all { (enabled, name) -> !enabled || File(directory, name).let { it.isFile && it.length() > 0 } }
+        when {
+            !valid -> {
+                notice = resources.getString(R.string.custom_routing_https_required)
+                noticeError = true
             }
-            Switch(value.enabled, onCheckedChange = { onChange(value.copy(enabled = it)) })
-        }
-        }
-        PreferenceSection {
-        Text(stringResource(slop.miho.chumpy.R.string.custom_routing_order), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.custom_routing_last_stage_fallback), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        value.stageOrder.forEachIndexed { index, stage ->
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stageLabel(stage), modifier = Modifier.weight(1f))
-                FilledTonalIconButton(enabled = index > 0, onClick = {
-                    val order = value.stageOrder.toMutableList()
-                    java.util.Collections.swap(order, index, index - 1)
-                    onChange(value.copy(stageOrder = order))
-                }) { Icon(painterResource(R.drawable.ic_chevron_right),
-                    contentDescription = stringResource(R.string.custom_routing_move_up, stageLabel(stage)),
-                    modifier = Modifier.size(24.dp).rotate(-90f)) }
-                FilledTonalIconButton(enabled = index < value.stageOrder.lastIndex, onClick = {
-                    val order = value.stageOrder.toMutableList()
-                    java.util.Collections.swap(order, index, index + 1)
-                    onChange(value.copy(stageOrder = order))
-                }) { Icon(painterResource(R.drawable.ic_chevron_right),
-                    contentDescription = stringResource(R.string.custom_routing_move_down, stageLabel(stage)),
-                    modifier = Modifier.size(24.dp).rotate(90f)) }
+            !importedReady -> {
+                notice = resources.getString(R.string.custom_routing_import_required)
+                noticeError = true
             }
+            else -> return true
         }
+        return false
+    }
+    Box(Modifier.fillMaxSize()) {
+        PreferenceEditor(R.string.custom_routing_title, onBack = { if (dirty) exitAsk = true else onBack() }) {            notice?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (noticeError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // The screen's one doorway: off, the preset regional routing stands and the
+            // rules below are preparation; on, the stages replace the presets entirely.
+            SettingsGroup(
+                {
+                    ToggleRow(
+                        title = stringResource(R.string.custom_routing_enabled),
+                        supporting = stringResource(
+                            if (value.enabled) R.string.custom_routing_exclusive_hint else R.string.custom_routing_off,
+                        ),
+                        icon = R.drawable.ic_tune,
+                        checked = value.enabled,
+                        onChange = { enabled -> onChange(value.copy(enabled = enabled)) },
+                    )
+                },
+            )
+            // The stages' order, its own group: swapping two neighbors slides them past
+            // each other, the way the servers list's own reorder moves.
+            StageOrderGroup(
+                order = value.stageOrder,
+                onSwap = { first, second ->
+                    val order = value.stageOrder.toMutableList()
+                    java.util.Collections.swap(order, first, second)
+                    onChange(value.copy(stageOrder = order))
+                },
+            )
+            EntryField(
+                stringResource(R.string.custom_routing_target_blocked), value.blocked,
+                categorySuggestionsGeo, categorySuggestionsIp,
+                onChange = { onChange(value.copy(blocked = it)) },
+            )
+            EntryField(
+                stringResource(R.string.custom_routing_target_direct), value.direct,
+                categorySuggestionsGeo, categorySuggestionsIp,
+                onChange = { onChange(value.copy(direct = it)) },
+            )
+            EntryField(
+                stringResource(R.string.custom_routing_target_proxy), value.proxy,
+                categorySuggestionsGeo, categorySuggestionsIp,
+                onChange = { onChange(value.copy(proxy = it)) },
+            )
+            // The geodata source: a preset strip riding the card's full width, then the
+            // two URLs the strip fills in. A hand-edited URL matching no preset leaves
+            // the strip with nothing picked.
+            SettingsGroup(
+                {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+                        PreferenceChoices(
+                            labels = geodataPresets.map { it.name },
+                            selected = geodataPresets.indexOfFirst {
+                                it.geosite == value.geositeUrl && it.geoip == value.geoipUrl &&
+                                    !value.customGeosite && !value.customGeoip
+                            },
+                            onSelect = { index ->
+                                val preset = geodataPresets[index]
+                                onChange(value.copy(
+                                    geositeUrl = preset.geosite, geoipUrl = preset.geoip,
+                                    customGeosite = false, customGeoip = false,
+                                ))
+                            },
+                            edgePadding = 16.dp,
+                        )
+                    }
+                },
+                {
+                    HappFieldRow(
+                        label = stringResource(R.string.custom_routing_geosite_url),
+                        value = value.geositeUrl,
+                        onChange = { onChange(value.copy(geositeUrl = it, customGeosite = false)) },
+                    )
+                },
+                {
+                    HappFieldRow(
+                        label = stringResource(R.string.custom_routing_geoip_url),
+                        value = value.geoipUrl,
+                        onChange = { onChange(value.copy(geoipUrl = it, customGeoip = false)) },
+                    )
+                },
+            )
+            // The catalogs' download: each row fetches its database, the tile spinning
+            // the percent under the title while it runs.
+            SettingsGroup(
+                *CategorySource.entries.map { source ->
+                    val name = if (source == CategorySource.GEOSITE) "GeoSite" else "GeoIP"
+                    val url = if (source == CategorySource.GEOSITE) value.geositeUrl else value.geoipUrl
+                    val loading = loadingSource == source
+                    val row: @Composable () -> Unit = {
+                        RoutingActionRow(
+                            title = stringResource(R.string.custom_routing_load_categories, name),
+                            supporting = when {
+                                loading && downloadPercent != null ->
+                                    stringResource(R.string.custom_routing_loading_percent, name, downloadPercent!!)
+                                loading -> stringResource(R.string.custom_routing_loading_categories, name)
+                                else -> null
+                            },
+                            icon = R.drawable.ic_download,
+                            loading = loading,
+                            enabled = !importing && url.isNotBlank(),
+                            onClick = { loadCategories(source) },
+                        )
+                    }
+                    row
+                }.toTypedArray(),
+            )
+            // The user's own databases, imported from a file: the toggle says the
+            // database rides, the row under it swaps the file in.
+            SettingsGroup(
+                {
+                    ToggleRow(
+                        title = stringResource(R.string.custom_routing_use_imported_geosite),
+                        supporting = null,
+                        icon = R.drawable.ic_database,
+                        checked = value.customGeosite,
+                        onChange = { enabled -> onChange(value.copy(customGeosite = enabled)) },
+                    )
+                },
+                {
+                    RoutingActionRow(
+                        title = stringResource(
+                            if (value.customGeosite) R.string.custom_routing_replace_geosite
+                            else R.string.custom_routing_import_geosite,
+                        ),
+                        supporting = null,
+                        icon = R.drawable.ic_upload_file,
+                        loading = importing && !importGeoip,
+                        enabled = !importing,
+                        onClick = { importGeoip = false; picker.launch(arrayOf("application/octet-stream", "*/*")) },
+                    )
+                },
+                {
+                    ToggleRow(
+                        title = stringResource(R.string.custom_routing_use_imported_geoip),
+                        supporting = null,
+                        icon = R.drawable.ic_database,
+                        checked = value.customGeoip,
+                        onChange = { enabled -> onChange(value.copy(customGeoip = enabled)) },
+                    )
+                },
+                {
+                    RoutingActionRow(
+                        title = stringResource(
+                            if (value.customGeoip) R.string.custom_routing_replace_geoip
+                            else R.string.custom_routing_import_geoip,
+                        ),
+                        supporting = null,
+                        icon = R.drawable.ic_upload_file,
+                        loading = importing && importGeoip,
+                        enabled = !importing,
+                        onClick = { importGeoip = true; picker.launch(arrayOf("application/octet-stream", "*/*")) },
+                    )
+                },
+            )
         }
-        EntryField(
-            stringResource(slop.miho.chumpy.R.string.custom_routing_target_blocked), value.blocked,
-            categorySuggestionsGeo, categorySuggestionsIp,
-            onChange = { onChange(value.copy(blocked = it)) },
+        // The ask's own dim: while the menu stands, the page and the bar's ground
+        // behind it sink under a scrim; tapping it closes the ask, the popup's own
+        // dismissal walking the same path.
+        val scrimAlpha by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (exitAsk) 1f else 0f,
+            label = "exit ask scrim",
         )
-        EntryField(
-            stringResource(slop.miho.chumpy.R.string.custom_routing_target_direct), value.direct,
-            categorySuggestionsGeo, categorySuggestionsIp,
-            onChange = { onChange(value.copy(direct = it)) },
-        )
-        EntryField(
-            stringResource(slop.miho.chumpy.R.string.custom_routing_target_proxy), value.proxy,
-            categorySuggestionsGeo, categorySuggestionsIp,
-            onChange = { onChange(value.copy(proxy = it)) },
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            geodataPresets.forEach { preset ->
-                FilterChip(
-                    selected = value.geositeUrl == preset.geosite && value.geoipUrl == preset.geoip,
-                    onClick = { onChange(value.copy(geositeUrl = preset.geosite, geoipUrl = preset.geoip, customGeosite = false, customGeoip = false)) },
-                    label = { Text(preset.name) },
+        if (scrimAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = scrimAlpha }
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                        enabled = exitAsk,
+                    ) { exitAsk = false },
+            )
+        }
+        // The exit ask's anchor: the menu hangs off this strip, centered over the bar's
+        // own ground.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+                        FloatingBottomBarReservedHeight,
+                ),
+        ) {
+            CardMenu(expanded = exitAsk, onDismissRequest = { exitAsk = false }) {
+                Text(
+                    text = stringResource(R.string.custom_routing_save_prompt),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.custom_routing_save)) },
+                    onClick = {
+                        exitAsk = false
+                        if (validate()) onSaveAndExit()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            painterResource(R.drawable.ic_check),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                    colors = MenuDefaults.itemColors(
+                        textColor = MaterialTheme.colorScheme.primary,
+                        leadingIconColor = MaterialTheme.colorScheme.primary,
+                    ),
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.custom_routing_discard)) },
+                    onClick = {
+                        exitAsk = false
+                        onBack()
+                    },
+                    leadingIcon = {
+                        Icon(
+                            painterResource(R.drawable.ic_close),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    },
+                    colors = MenuDefaults.itemColors(
+                        textColor = MaterialTheme.colorScheme.error,
+                        leadingIconColor = MaterialTheme.colorScheme.error,
+                    ),
                 )
             }
         }
-        PreferenceField(
-            value = value.geositeUrl,
-            onValueChange = { onChange(value.copy(geositeUrl = it, customGeosite = false)) },
-            label = stringResource(R.string.custom_routing_geosite_url),
-            singleLine = true,
-        )
-        PreferenceField(
-            value = value.geoipUrl,
-            onValueChange = { onChange(value.copy(geoipUrl = it, customGeoip = false)) },
-            label = stringResource(R.string.custom_routing_geoip_url),
-            singleLine = true,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            CategorySource.entries.forEach { source ->
-                val url = if (source == CategorySource.GEOSITE) value.geositeUrl else value.geoipUrl
-                FilledTonalButton(enabled = !importing && url.isNotBlank(), onClick = { loadCategories(source) },
-                    modifier = Modifier.fillMaxWidth()) {
-                    if (loadingSource == source) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    val name = if (source == CategorySource.GEOSITE) "GeoSite" else "GeoIP"
-                    Text(if (loadingSource == source && downloadPercent != null) {
-                        stringResource(R.string.custom_routing_loading_percent, name, downloadPercent!!)
-                    } else stringResource(
-                        if (loadingSource == source) R.string.custom_routing_loading_categories
-                        else R.string.custom_routing_load_categories, name))
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geosite), modifier = Modifier.weight(1f))
-            Switch(value.customGeosite, onCheckedChange = { onChange(value.copy(customGeosite = it)) })
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(slop.miho.chumpy.R.string.custom_routing_use_imported_geoip), modifier = Modifier.weight(1f))
-            Switch(value.customGeoip, onCheckedChange = { onChange(value.copy(customGeoip = it)) })
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !importing, onClick = { importGeoip = false; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
-                Text(stringResource(if (value.customGeosite) slop.miho.chumpy.R.string.custom_routing_replace_geosite else slop.miho.chumpy.R.string.custom_routing_import_geosite))
-            }
-            FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = !importing, onClick = { importGeoip = true; picker.launch(arrayOf("application/octet-stream", "*/*")) }) {
-                Text(stringResource(if (value.customGeoip) slop.miho.chumpy.R.string.custom_routing_replace_geoip else slop.miho.chumpy.R.string.custom_routing_import_geoip))
-            }
-        }
-        notice?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        FilledTonalButton(modifier = Modifier.fillMaxWidth(), enabled = dirty && !importing,
-            onClick = {
-                val valid = !value.enabled || listOf(value.geositeUrl, value.geoipUrl).all { raw ->
-                    raw.isBlank() || raw.trim().toHttpUrlOrNull()?.let {
-                        it.isHttps && it.username.isEmpty() && it.password.isEmpty()
-                    } == true
-                }
-                val directory = File(context.filesDir, "xray_assets")
-                val importedReady = !value.enabled || listOf(
-                    value.customGeosite to GeodataFiles.USER_GEOSITE_FILE,
-                    value.customGeoip to GeodataFiles.USER_GEOIP_FILE,
-                ).all { (enabled, name) -> !enabled || File(directory, name).let { it.isFile && it.length() > 0 } }
-                when {
-                    !valid -> notice = resources.getString(R.string.custom_routing_https_required)
-                    !importedReady -> notice = resources.getString(R.string.custom_routing_import_required)
-                    else -> onSave()
-                }
-            }) { Text(stringResource(R.string.custom_routing_save)) }
     }
 }
 
@@ -372,6 +545,196 @@ private fun stageLabel(stage: CustomRouteStage): String = stringResource(
         CustomRouteStage.PROXY -> slop.miho.chumpy.R.string.custom_routing_target_proxy
     },
 )
+
+/**
+ * The stages' order as an animated stack in the settings group's own clothes: the header
+ * row with the fallback story on top, then the stages, each keyed by its stage so a swap
+ * moves it instead of rewriting it — the rows slide to their new slots on the motion
+ * scheme's spatial spec, the servers list's own reorder dance.
+ */
+@Composable
+private fun StageOrderGroup(
+    order: List<CustomRouteStage>,
+    onSwap: (first: Int, second: Int) -> Unit,
+) {
+    val outer = MaterialTheme.shapes.extraLarge
+    val inner = MaterialTheme.shapes.extraSmall
+    val motion = MaterialTheme.motionScheme
+    val rowHeight = 80.dp
+    val gap = 2.dp
+    Column(Modifier.fillMaxWidth().clip(outer)) {
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainer.withSurfaceOpacity(),
+            shape = RoundedCornerShape(
+                topStart = outer.topStart,
+                topEnd = outer.topEnd,
+                bottomStart = inner.bottomStart,
+                bottomEnd = inner.bottomEnd,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+                Text(
+                    text = stringResource(R.string.custom_routing_order),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.custom_routing_last_stage_fallback),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.height(gap))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(rowHeight * order.size + gap * (order.size - 1)),
+        ) {
+            order.forEachIndexed { index, stage ->
+                key(stage) {
+                    val offsetY by animateDpAsState(
+                        targetValue = (rowHeight + gap) * index,
+                        animationSpec = motion.defaultSpatialSpec(),
+                        label = "stage row offset",
+                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainer.withSurfaceOpacity(),
+                        shape = RoundedCornerShape(
+                            topStart = if (index == 0) outer.topStart else inner.topStart,
+                            topEnd = if (index == 0) outer.topEnd else inner.topEnd,
+                            bottomStart = if (index == order.lastIndex) outer.bottomStart else inner.bottomStart,
+                            bottomEnd = if (index == order.lastIndex) outer.bottomEnd else inner.bottomEnd,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(rowHeight)
+                            .offset { IntOffset(0, offsetY.roundToPx()) },
+                    ) {
+                        StageMoveRow(
+                            title = stageLabel(stage),
+                            canMoveUp = index > 0,
+                            canMoveDown = index < order.lastIndex,
+                            onMoveUp = { onSwap(index, index - 1) },
+                            onMoveDown = { onSwap(index, index + 1) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * One stage of the rules' order: its name and the two square icon tiles that move it,
+ * the icon rows' own language — asleep dimmed, the disabled direction untouchable.
+ */
+@Composable
+private fun StageMoveRow(
+    title: String,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            modifier = Modifier.padding(start = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SquareIconButton(
+                label = stringResource(R.string.custom_routing_move_up, title),
+                selected = false,
+                onClick = onMoveUp,
+                enabled = canMoveUp,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_chevron_right),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp).rotate(-90f),
+                )
+            }
+            SquareIconButton(
+                label = stringResource(R.string.custom_routing_move_down, title),
+                selected = false,
+                onClick = onMoveDown,
+                enabled = canMoveDown,
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_chevron_right),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp).rotate(90f),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A whole row whose tap is one action (a download or an import): the title on the left,
+ * the settings' own square icon tile trailing — a spinner in the tile's place while the
+ * work runs. Asleep, the row dims.
+ */
+@Composable
+private fun RoutingActionRow(
+    title: String,
+    supporting: String?,
+    icon: Int,
+    loading: Boolean = false,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = if (enabled) 1f else 0.38f }
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            supporting?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        SquareIconButton(
+            label = title,
+            selected = false,
+            onClick = onClick,
+            enabled = enabled && !loading,
+        ) {
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(
+                    painterResource(icon),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun EntryField(
@@ -412,6 +775,7 @@ private fun EntryField(
         label = title,
         singleLine = false,
         minLines = 3,
+        placeholder = stringResource(R.string.custom_routing_entries_placeholder),
     )
     if (suggestions.isNotEmpty()) {
         Row(

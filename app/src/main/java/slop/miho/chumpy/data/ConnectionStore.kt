@@ -60,7 +60,7 @@ data class ConnectionSettings(
     val selectedSubscriptionId: String? = null,
     /** The profile a connect uses; restored across restarts. */
     val selectedProfileId: String? = null,
-    val routingMode: RoutingMode = RoutingMode.GLOBAL,
+    val routingMode: RoutingMode = RoutingMode.DISABLED,
     /** The servers list's own order — the header's chip picks it, and it sticks. */
     val serversSort: ServersSort = ServersSort.DEFAULT,
     /** The URL real delay measurements fetch through the tested outbound. */
@@ -142,7 +142,7 @@ object ConnectionStore {
             selectedSubscriptionId = json.optString(KEY_SUB).takeIf { it.isNotEmpty() },
             selectedProfileId = json.optString(KEY_PROFILE).takeIf { it.isNotEmpty() },
             routingMode = RoutingMode.entries.firstOrNull { it.name == json.optString(KEY_ROUTING) }
-                ?: RoutingMode.GLOBAL,
+                ?: RoutingMode.DISABLED,
             serversSort = json.optString(KEY_SERVERS_SORT)
                 .let { stored -> ServersSort.entries.firstOrNull { it.name == stored } }
                 ?: ServersSort.DEFAULT,
@@ -205,7 +205,7 @@ object ConnectionStore {
                     RoutingMode.entries.firstOrNull { it.name == stored }
                         ?: if (stored == "RU_BYPASS") RoutingMode.BYPASS_RU else null
                 }
-                ?: RoutingMode.GLOBAL,
+                ?: RoutingMode.DISABLED,
             serversSort = prefs.getString(KEY_SERVERS_SORT, null)
                 ?.let { stored -> ServersSort.entries.firstOrNull { it.name == stored } }
                 ?: ServersSort.DEFAULT,

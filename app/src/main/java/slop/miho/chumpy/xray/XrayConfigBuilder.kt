@@ -14,15 +14,15 @@ import slop.miho.chumpy.db.ProfileEntity
 import slop.miho.chumpy.db.ProfileType
 
 /**
- * Routing intent of a session: everything through the tunnel, or everything but the
- * geo-RU block. The rule sets mirror v2rayNG's global and "white Russia" presets.
- */
-/**
- * The routing modes: one bypass region each — the region's own sites and addresses go
- * direct, the rest rides the proxy — with the whole-world mode last. The region set is
- * the panels' own (hiddify's ir/cn/ru/af/id/tr/br, v2rayNG's Russia and Iran presets).
+ * The routing modes: [DISABLED] routes absolutely everything through the tunnel with no
+ * rules at all; [GLOBAL] follows the subscription — the panel's own carried rules, when
+ * the profile brought any (a profile without them rides as [DISABLED]); then one bypass
+ * region each — the region's own sites and addresses go direct, the rest rides the
+ * proxy. The region set is the panels' own (hiddify's ir/cn/ru/af/id/tr/br, v2rayNG's
+ * Russia and Iran presets).
  */
 enum class RoutingMode(val region: String?) {
+    DISABLED(null),
     GLOBAL(null),
     BYPASS_RU("ru"),
     BYPASS_CN("cn"),
@@ -391,7 +391,14 @@ object XrayConfigBuilder {
                         else put("outboundTag", PROXY_TAG)
                     }
                 } else {
-                mode.region?.let { region ->
+                // A subscription follow without rules to follow is the plain everything
+                // mode: nothing of the panel's rides, nothing of ours stands in the way.
+                val effectiveMode = if (mode == RoutingMode.GLOBAL && profileRules.isBlank()) {
+                    RoutingMode.DISABLED
+                } else {
+                    mode
+                }
+                effectiveMode.region?.let { region ->
                     // Sniffed BitTorrent goes direct in bypass mode, as in v2rayNG's presets.
                     rule {
                         put("protocol", buildJsonArray { add(JsonPrimitive("bittorrent")) })
@@ -416,6 +423,7 @@ object XrayConfigBuilder {
                         put("outboundTag", DIRECT_TAG)
                     }
                 }
+                if (effectiveMode != RoutingMode.DISABLED) {
                 // QUIC would tunnel UDP 443; blocking it keeps traffic on sniffable TCP.
                 rule {
                     put("port", "443")
@@ -435,6 +443,7 @@ object XrayConfigBuilder {
                 // the balancer's whole point in the panel's terms. Targets rewritten onto
                 // this session's tags; the fall-through stays ours.
                 panelRules(profileRules, balanced).forEach { add(slop.miho.chumpy.sub.GeodataSources.rewrite(it, geodataSources)) }
+                }
                 if (balanced) {
                     // The catch-all rides the balancer: whatever the bypass rules let
                     // through, the core picks the member for — at random, by ping or by

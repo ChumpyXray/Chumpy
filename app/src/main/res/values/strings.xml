@@ -168,8 +168,10 @@
     <string name="settings_small_screen_forced_off">Small screen layout forced off. Long-tap to switch</string>
 
     <!-- Connection settings -->
-    <string name="settings_routing_global">Global</string>
-    <string name="settings_routing_global_hint">Route everything</string>
+    <string name="settings_routing_disabled">Disabled</string>
+    <string name="settings_routing_disabled_hint">Route absolutely everything</string>
+    <string name="settings_routing_subscription">Follow subscription</string>
+    <string name="settings_routing_subscription_hint">The subscription\'s own routing rules</string>
     <string name="settings_routing_dont_route">Don\'t route %s</string>
     <string name="custom_routing_title">Custom routing</string>
     <string name="custom_routing_off">Blocked, direct and proxy rules</string>
@@ -193,6 +195,7 @@
         <item quantity="one">Imported %1$d category</item>
         <item quantity="other">Imported %1$d categories</item>
     </plurals>
+    <string name="custom_routing_entries_placeholder">One rule per line: example.com, geosite:category or geoip:country</string>
     <string name="custom_routing_target_blocked">Blocked</string>
     <string name="custom_routing_target_direct">Direct</string>
     <string name="custom_routing_target_proxy">Proxy</string>
@@ -201,7 +204,7 @@
         <item quantity="other">%1$d custom entries</item>
     </plurals>
     <string name="per_app_only_empty">Pick at least one app to proxy</string>
-    <string name="subscription_request_settings">Request and HWID settings</string>
+    <string name="subscription_request_settings">Identity</string>
     <string name="region_ru">Russia</string>
     <string name="region_cn">China</string>
     <string name="region_ir">Iran</string>
@@ -219,7 +222,9 @@
     </plurals>
     <string name="per_app_disabled">Disabled</string>
     <string name="per_app_bypass_mode">Bypass selected</string>
+    <string name="per_app_bypass_mode_hint">Selected apps will NOT be proxied</string>
     <string name="per_app_only_mode">Proxy selected only</string>
+    <string name="per_app_only_mode_hint">Only selected apps will be proxied</string>
     <plurals name="per_app_only_count">
         <item quantity="one">Proxy only %1$d app</item>
         <item quantity="other">Proxy only %1$d apps</item>
@@ -236,7 +241,7 @@
         <item quantity="one">Auto-updates %d subscription</item>
         <item quantity="other">Auto-updates %d subscriptions</item>
     </plurals>
-    <string name="settings_about_core">Xray core</string>
+    <string name="settings_about_core">Core</string>
     <string name="settings_about_core_running">running</string>
     <string name="settings_about_core_not_running">stopped</string>
     <string name="settings_about_version">Version</string>
@@ -402,12 +407,12 @@
     <string name="tunnel_error_timeout">The connection took too long. Try again or choose another server.</string>
     <string name="tunnel_error_stopping">The VPN is still stopping. Wait a moment and try again.</string>
     <string name="tunnel_error_storage">The device is out of storage. Free some space and try again.</string>
+    <string name="request_custom_hwid">Custom HWID</string>
+    <string name="request_custom_hwid_off">Default</string>
     <string name="request_client">Client</string>
-    <string name="request_inherit">App default</string>
-    <string name="request_off">Off</string>
-    <string name="request_send">Send</string>
-    <string name="request_omit">Omit</string>
-    <string name="custom_routing_save">Save rules</string>
+    <string name="custom_routing_save">Save</string>
+    <string name="custom_routing_save_prompt">Save the settings?</string>
+    <string name="custom_routing_discard">Don\'t save</string>
     <string name="custom_routing_https_required">Use HTTPS links without a username or password.</string>
     <string name="custom_routing_load_categories">Load %1$s categories</string>
     <string name="request_save_error">Could not read or save settings. See logs.</string>
@@ -417,7 +422,6 @@
     <string name="custom_routing_operation_error">Could not load the database. Check the file or link. See logs for details.</string>
     <string name="custom_routing_loading_categories">Loading %1$s…</string>
     <string name="custom_routing_loading_percent">Loading %1$s: %2$d%%</string>
-    <string name="subscription_request_pick">Choose a subscription</string>
     <string name="random_local_port">Random local port</string>
     <string name="local_proxy_port">Local SOCKS port (1024 to 65535)</string>
     <string name="local_port_reconnect">Applies on the next VPN connection. Turn off random selection to use the specified port.</string>

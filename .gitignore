@@ -24,3 +24,6 @@ keystore.properties
 
 # The delivery script: local for now.
 build.sh
+
+# The agent's own notes: local to this machine.
+AGENTS.md
